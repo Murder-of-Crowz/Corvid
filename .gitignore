@@ -1,0 +1,18 @@
+# Rust build output
+target/
+**/*.rs.bk
+
+# WoW client logs and local addon data
+WoWCombatLog*.txt
+WoWChatLog*.txt
+/Corvid/
+
+# Local environment settings
+.env
+.env.*
+!.env.example
+
+# Local editor and OS files
+/.idea/
+Thumbs.db
+.DS_Store
