@@ -4,12 +4,12 @@ f:SetScript("OnEvent", function()
     pcall(SetCVar, "advancedCombatLogging", 1)
     LoggingCombat(true)
     LoggingChat(true)
-    print("WFTest: combat", LoggingCombat(), "chat", LoggingChat(),
+    print("Corvid: combat", LoggingCombat(), "chat", LoggingChat(),
           "advanced", GetCVar("advancedCombatLogging"))
 end)
 
-SLASH_WFTEST1 = "/corvid"
-SlashCmdList.WFTEST = function()
+SLASH_CORVID1 = "/corvid"
+SlashCmdList.CORVID = function()
     for _, unit in ipairs({"player", "party1", "party2"}) do
         local map = C_Map.GetBestMapForUnit(unit)
         local pos = map and C_Map.GetPlayerMapPosition(map, unit)
