@@ -1,10 +1,25 @@
-# Rust build output
+# Rust and Tauri build output
 target/
-**/*.rs.bk
+*.rs.bk
+/desktop/src-tauri/gen/schemas/
+
+# Desktop dependencies, build output, and local tooling files
+node_modules/
+/desktop/dist/
+/desktop/dist-ssr/
+/desktop/**/*.local
+/desktop/**/logs/
+/desktop/**/*.log
+/desktop/**/npm-debug.log*
+/desktop/**/yarn-debug.log*
+/desktop/**/yarn-error.log*
+/desktop/**/pnpm-debug.log*
+/desktop/**/lerna-debug.log*
 
 # WoW client logs and local addon data
 WoWCombatLog*.txt
 WoWChatLog*.txt
+/WTF/
 /Corvid/
 
 # Local environment settings
@@ -13,6 +28,13 @@ WoWChatLog*.txt
 !.env.example
 
 # Local editor and OS files
-/.idea/
+.idea/
+/desktop/.vscode/*
+!/desktop/.vscode/extensions.json
+/desktop/**/*.suo
+/desktop/**/*.ntvs*
+/desktop/**/*.njsproj
+/desktop/**/*.sln
+/desktop/**/*.sw?
 Thumbs.db
 .DS_Store

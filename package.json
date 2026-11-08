@@ -1,0 +1,7 @@
+{
+  "name": "corvid",
+  "private": true,
+  "scripts": {
+    "check-version": "node scripts/check-version.mjs"
+  }
+}
