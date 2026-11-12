@@ -153,7 +153,7 @@ The first command runs the tests once. The second checks TypeScript, including t
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pull requests, on pushes to `main`, and when started manually from the **Actions** tab. It has two jobs:
+`.github/workflows/ci.yml` runs on every push on any branches, and when started manually from the **Actions** tab. It has two jobs:
 
 - **Web UI** (Ubuntu): installs npm packages, runs the tests, then type-checks and builds the frontend. The build step runs even when tests fail, so one run reports both.
 - **Rust backend** (Windows): installs the toolchain pinned in `rust-toolchain.toml`, runs `npm run check-version`, builds the frontend (Tauri embeds `desktop/dist` when it compiles), then runs `cargo test --locked`.

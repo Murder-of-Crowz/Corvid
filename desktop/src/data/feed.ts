@@ -44,10 +44,20 @@ export interface ReplayStatus {
   done: boolean;
 }
 
-/** The fixutre is loaded on demand, so the app never loads it at startup. */
+/** 
+ * The sample session is not committed. scripts/make-sample-session.mjs builds it.
+ * import.meta.glob finds it when it exists and returns nothing when ti doesn't,
+ * so the app still builds without it. It's loaded on demand, never at startup.
+ */
+const samples = import.meta.glob<unknown>("../../../fixtures/events/sample-session.json", { import: "default" });
+
 async function loadSample(): Promise<CorvidEvent[]> {
-  const { default: data } = await import("../../../fixtures/events/sample-session.json");
-  return toEvents(data, "sample-session.json").sort((a, b) => a.ts - b.ts);
+  const load = Object.values(samples)[0];
+  if (!load) {
+    console.warn("[corvid] No sample session. Run scripts/make-sample-session.mjs, then restart npm run dev.")
+    return [];
+  }
+  return toEvents(await load(), "sample-session.json").sort((a, b) => a.ts - b.ts);
 }
 
 /**
