@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch or pull request cancels the run in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Web UI (tests, types, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: desktop/package.json
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install npm packages
+        run: npm ci
+
+      # Vitest runs once, without watching, when the CI variable is set.
+      - name: Test
+        run: npm test
+
+      # Runs even when tests fail, so one run reports both test and type errors.
+      - name: Type-check and build
+        if: ${{ !cancelled() }}
+        run: npm run build
+
+  rust:
+    name: Rust backend (Windows)
+    # rust-toolchain.toml pins the Windows MSVC toolchain, and Windows is the first target.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: desktop/package.json
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+
+      - name: Install npm packages
+        working-directory: desktop
+        run: npm ci
+
+      - name: Check tool versions
+        run: npm run check-version
+
+      # Tauri embeds desktop/dist when it compiles, so the UI is built first.
+      - name: Build the web UI
+        working-directory: desktop
+        run: npm run build
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Test
+        working-directory: desktop/src-tauri
+        run: cargo test --locked

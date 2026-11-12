@@ -2,13 +2,19 @@
 
 Corvid is a Windows desktop companion and Lua addon for World of Warcraft: Forever. We’re building a combat log reader, a damage and healing meter, and a map that shows positions from combat events. The goal is to keep recent fights locally so players can review them after combat.
 
-The desktop app currently opens a window that says **Corvid**. The addon attempts to enable advanced combat logging on world entry, and `/corvid` checks which player and party positions the game returns. The next milestone is to show new combat log lines in the desktop window while WoW is running.
+The desktop UI has three views: a damage and healing meter with a per-spell breakdown, a map with your trail and position, and a raw event list. It reads events from the Rust backend through the contract in `desktop/src/data/event.ts`. Until the Rust log reader sends events, you can work on the UI in a browser, where it replays a recorded session. The addon attempts to enable advanced combat logging on world entry, and `/corvid` checks which player and party positions the game returns. The next milestone is the Rust log reader, which will send new combat log events to the UI while WoW is running.
 
 | Folder | Contents |
 | --- | --- |
 | `addon/` | `Corvid.toc` and `Corvid.lua` |
 | `desktop/src/` | React + TypeScript UI, built with Vite |
+| `desktop/src/data/` | Event contract, event store, event feed, and the fight and map calculations |
+| `desktop/src/views/` | Meter, map, and events views |
+| `desktop/tests/` | Vitest tests |
 | `desktop/src-tauri/` | Rust backend and Tauri configuration |
+| `fixtures/events/` | Sample session for the browser replay and the tests, built locally and not committed |
+| `scripts/` | Version check, and the script that builds the sample session |
+| `.github/workflows/` | CI |
 
 ## Tech stack and pinned versions
 
@@ -19,6 +25,7 @@ The desktop app currently opens a window that says **Corvid**. The addon attempt
 | React / React DOM | 19.3.1 / 19.3.1 |
 | TypeScript / React type packages | 6.0.3 / 19.3.0 |
 | Vite / React plugin | 8.3.6 / 6.2.1 |
+| Vitest | 5.0.5 |
 | Tauri Rust crate / Tauri build crate | 2.12.5 / 2.7.4 |
 | Tauri npm CLI / JavaScript API | 2.12.4 / 2.12.4 |
 | Tauri opener plugin | 2.7.2 on both sides |
@@ -63,6 +70,57 @@ npm run tauri dev
 
 Run `npm run check-version` from the repo root after installing dependencies or changing your toolchain. It prints each current and expected version, checks the installed direct frontend packages against the pins, and exits with status 1 if anything is missing or mismatched. The root command requires no separate npm install. To upgrade the baseline, update the relevant pins and lockfiles together and rerun the version and build checks.
 
+Install npm packages from `desktop/`, not the repo root. The root `package.json` only holds the `check-version` script.
+
+## Work on the UI in a browser
+
+The UI runs without Rust or the game. In a browser, it replays a sample session built from one of your own combat logs, so build that first.
+
+1. Find a combat log in the WoW: Forever client's `Logs\` folder, for example `WoWCombatLog-110526_231729.txt`. Use one recorded with advanced combat logging on, so it has positions for the map. You can pass its full path to the script, or copy it into the repo's `WTF/CombatLog/` folder, which is gitignored.
+2. From the repo root, build the sample session:
+
+   ```powershell
+   node scripts/make-sample-session.mjs WTF/CombatLog/WoWCombatLog-110526_231729.txt
+   ```
+
+   It prints a summary such as `240 events, 14 fights, 219 s replay -> fixtures/events/sample-session.json`.
+
+   > The "WTF/CombatLog/WoWCombatLog-110526_231729.txt" is just a placeholder for now, it is where I currently have logs stored at. Will update loc later on.
+
+3. From `desktop/`, start the dev server:
+
+   ```powershell
+   npm run dev
+   ```
+
+Open <http://localhost:1420>. Outside Tauri, the app replays `fixtures/events/sample-session.json` as if it were happening live. The header has replay speed buttons (1, 4, and 20 times) and **Restart**. Inside the Tauri window, the same UI listens for events from Rust instead and shows **Live**.
+
+If the header shows **Replay finished 0:00 / 0:00** and the views are empty, the sample session is missing. The developer console also logs `[corvid] No sample session`. Run step 2, then restart `npm run dev`.
+
+## Event contract
+
+`desktop/src/data/event.ts` defines the events Rust sends to the UI. Rust emits batches (`CorvidEvent[]`) on the Tauri event `corvid://events`, with camelCase field names. On the Rust side, use `#[serde(tag = "type", rename_all = "camelCase")]`. The UI drops events that don't match the contract and logs a `[corvid]` warning in the developer console, so check the console first if events don't appear.
+
+## Sample session
+
+`scripts/make-sample-session.mjs` builds the sample session from a real combat log. It keeps only events involving the player who recorded the log and the mobs they fought, and drops everyone else. The recording player's name and GUID are kept.
+
+The script writes `fixtures/events/sample-session.json` unless you pass a different output path as a second argument. It also shortens idle stretches so the replay doesn't sit still between fights. Each developer builds their own, and `fixtures/events/` is gitignored, so the file is never committed.
+
+Don't commit raw combat logs either. They contain other players' names. `WTF/` and `WoWCombatLog*.txt` are gitignored.
+
+## Tests
+
+From `desktop/`:
+
+```powershell
+npm test
+```
+
+This reruns the tests each time you save a file. To run them once, use `npx vitest run`. Tests live in `desktop/tests/` as `*.test.ts` files and cover the event contract, text and number formatting, fight totals, and map trails. They need neither the game nor Rust.
+
+Most tests use small made-up events. Four also run on your sample session, if you've built one, and check things that hold for any log, such as meter totals matching the raw events. Without a sample session, as in CI, those four are skipped.
+
 ## Install and test the WoW addon
 
 1. Open `Interface\AddOns\` under the active WoW: Forever client folder (for example, `_forever_\Interface\AddOns\`).
@@ -85,12 +143,20 @@ Run the desktop app separately in PowerShell. The combat log is the first data s
 Run from `desktop/`:
 
 ```powershell
+npx vitest run
 npm run build
 cargo check --locked --manifest-path src-tauri/Cargo.toml
 npm run tauri build -- --debug --no-bundle
 ```
 
-The first command checks TypeScript and builds the Vite frontend into `dist/`. The Cargo command checks the Rust backend and fails if Cargo would need to change the lockfile. The last command builds the Windows debug executable without packaging an installer. To build a release installer, use `npm run tauri build`.
+The first command runs the tests once. The second checks TypeScript, including the tests, and builds the Vite frontend into `dist/`. The Cargo command checks the Rust backend and fails if Cargo would need to change the lockfile. The last command builds the Windows debug executable without packaging an installer. To build a release installer, use `npm run tauri build`.
+
+## CI
+
+`.github/workflows/ci.yml` runs on pull requests, on pushes to `main`, and when started manually from the **Actions** tab. It has two jobs:
+
+- **Web UI** (Ubuntu): installs npm packages, runs the tests, then type-checks and builds the frontend. The build step runs even when tests fail, so one run reports both.
+- **Rust backend** (Windows): installs the toolchain pinned in `rust-toolchain.toml`, runs `npm run check-version`, builds the frontend (Tauri embeds `desktop/dist` when it compiles), then runs `cargo test --locked`.
 
 ## Fix: Tauri reports that Cargo was not found
 
