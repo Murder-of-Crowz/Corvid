@@ -80,7 +80,6 @@ fn follow<R: Runtime>(app: AppHandle<R>, folder: Option<PathBuf>, chosen: Receiv
     }
 }
 
-
 /// Reads the zone and map from what `path` already holds. The game only writes
 /// them when a log starts or the player changes zone, and the follower starts
 /// at the end of a log that's already open.

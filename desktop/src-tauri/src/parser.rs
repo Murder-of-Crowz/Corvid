@@ -90,6 +90,12 @@ impl Parser {
             }
             "SPELL_HEAL" | "SPELL_PERIODIC_HEAL" => {
                 self.add_position(ts, &f, advanced, &source, &target, events);
+                if involves_me {
+                    self.add_heal(ts, &f, source, target, events);
+                }
+            }
+            "SWING_DAMAGE_LANDED" | "SPELL_CAST_SUCCESS" | "SPELL_ENERGIZE" => {
+                self.add_position(ts, &f, advanced, &source, &target, events);
             }
             "UNIT_DIED" => self.add_death(ts, target, events),
             _ => {}
@@ -224,7 +230,7 @@ impl Parser {
             spell,
             amount,
             overkill: positive(f, s + 2),
-            critical: f.get(s + 7) == Some(&"1")
+            critical: f.get(s + 7) == Some(&"1"),
         })));
     }
 
@@ -408,6 +414,8 @@ fn unit(guid: &str, name: &str, flags: &str) -> Unit {
     let affiliation = if flags & AFFILIATION_MINE != 0 {
         Affiliation::Me
     } else if flags & AFFILIATION_PARTY != 0 {
+        Affiliation::Party
+    } else if flags & AFFILIATION_RAID != 0 {
         Affiliation::Raid
     } else {
         Affiliation::Outsider

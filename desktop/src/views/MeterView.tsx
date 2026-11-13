@@ -24,49 +24,40 @@ export function MeterView() {
   }
 
   const top = rows[0]?.total ?? 0;
-  const groupTotal = rows.reduce((sum, row) => sum + row.total, 0);
-  const groupRate = rows.reduce((sum, row) => sum + row.perSecond, 0);
 
   return (
     <section className={`meter meter-${mode}`}>
-      <div className="meter-toolbar">
-        <select
-          className="meter-fight"
-          aria-label="Fight"
-          value={pinnedId ?? ""}
-          onChange={(e) => setPinnedId(e.target.value || null)}
-        >
-          <option value="">Latest fight</option>
-          {[...fights].reverse().map((f) => (
-            <option key={f.id} value={f.id}>
-              {fightLabel(f)}
-            </option>
-          ))}
-        </select>
-        <div className="meter-modes" role="group" aria-label="Show">
-          {MODES.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              className="chip"
-              aria-pressed={mode === m.id}
-              onClick={() => setMode(m.id)}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
+      <select
+        className="meter-fight"
+        aria-label="Fight"
+        value={pinnedId ?? ""}
+        onChange={(e) => setPinnedId(e.target.value || null)}
+      >
+        <option value="">Latest fight</option>
+        {[...fights].reverse().map((f) => (
+          <option key={f.id} value={f.id}>
+            {fightLabel(f)}
+          </option>
+        ))}
+      </select>
+
+      <div className="meter-modes" role="group" aria-label="Show">
+        {MODES.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            className="chip"
+            aria-pressed={mode === m.id}
+            onClick={() => setMode(m.id)}
+          >
+            {m.label}
+          </button>
+        ))}
       </div>
 
-      <div className="meter-summary">
-        <span className="meter-title">{fight.name}</span>
-        <span className="muted">
-          {fight.end === undefined ? "In combat" : "Ended"} &middot; {formatDuration(fightDuration(fight))}
-        </span>
-        <span className="meter-summary-total">
-          {formatNumber(groupTotal)} <span className="muted">{formatRate(groupRate)}/s</span>
-        </span>
-      </div>
+      <p className="meter-title">
+        {fight.name} : <span className="muted">{fight.end === undefined ? "in combat" : formatClock(fight.end)}</span>
+      </p>
 
       {rows.length === 0 ? (
         <p className="view-empty">No {mode} by your side in this fight.</p>
