@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { Unit } from "../src/data/event";
-import { describe as describeEvent, formatCoord, formatDuration, formatPercent, formatRate } from "../src/lib/format";
+import {
+  describe as describeEvent,
+  folderName,
+  formatCoord,
+  formatDuration,
+  formatPercent,
+  formatRate,
+} from "../src/lib/format";
 
 const me: Unit = { guid: "Player-1", name: "Anslem Nightglyph", kind: "player", affiliation: "self" };
 const mob: Unit = { guid: "Creature-1", name: "Mindless Zombie", kind: "npc", affiliation: "outsider" };
@@ -45,5 +52,14 @@ describe("number formats", () => {
     expect(formatRate(7.24)).toBe("7.2");
     expect(formatRate(1234.5)).toMatch(/^1\D?235$/); // the separator depends on locale
     expect(formatPercent(0.256)).toBe("26%");
+  });
+});
+
+describe("folderName", () => {
+  it("keeps the last part of Windows and Unix paths", () => {
+    expect(folderName(String.raw`D:\Games\WoW Forever\Logs`)).toBe("Logs");
+    expect(folderName("D:\\Games\\Logs\\")).toBe("Logs");
+    expect(folderName("/home/me/wow/Logs")).toBe("Logs");
+    expect(folderName("C:\\")).toBe("C:");
   });
 });

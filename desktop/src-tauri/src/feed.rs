@@ -1,0 +1,76 @@
+//! Sends new combat log lines to the UI while the app runs. For now each line
+//! goes out as a `rawLine` event; ther parser will turn them into real events.
+
+use std::path::{Path, PathBuf};
+use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use tauri::{AppHandle, Emitter, Runtime};
+
+use crate::events::{CorvidEvent, EVENTS_CHANNEL, LogKind, RawLineEvent, Timestamp};
+use crate::log_reader::LogFollower;
+
+// How often the lo gis checked for new lines.
+const POLL_INTERVAL: Duration = Duration::from_millis(100);
+
+// Follows the combat logs in `folder` on a background thread for as
+// long as the app runs. Each poll's new lines are sent as one batch.
+pub fn start<R: Runtime>(app: AppHandle<R>, folder: PathBuf) {
+    thread::spawn(move || {
+        let mut follower = LogFollower::new(folder);
+        let mut following: Option<PathBuf> = None;
+        let mut last_error: Option<String> = None;
+
+        loop {
+            match follower.poll() {
+                Ok(lines) => {
+                    last_error = None;
+                    send(&app, lines);
+                }
+                Err(error) => {
+                    let message = error.to_string();
+                    if last_error.as_ref() != Some(&message) {
+                        eprintln!("[corvid] couldn't read the combat log: {message}")
+                    }
+                    last_error = Some(message)
+                }
+            }
+
+            if follower.current_path() != following.as_deref() {
+                following = follower.current_path().map(Path::to_path_buf);
+                if let Some(path) = &following {
+                    println!("[corvid] following {}", path.display());
+                }
+            }
+            thread::sleep(POLL_INTERVAL);
+        }
+    });
+}
+
+/// Emits `lines` as `rawLine` events. Their `ts` is when Corvid read
+/// them; the game's own timestamp is still at the start of each line.
+fn send<R: Runtime>(app: &AppHandle<R>, lines: Vec<String>) {
+    if lines.is_empty() {
+        return;
+    }
+    let ts = now_ms();
+    let batch: Vec<CorvidEvent> = lines
+        .into_iter()
+        .map(|line| {
+            CorvidEvent::RawLine(RawLineEvent {
+                ts,
+                log: LogKind::Combat,
+                line,
+            })
+        })
+        .collect();
+    if let Err(error) = app.emit(EVENTS_CHANNEL, batch) {
+        eprintln!("[corvid] couldn't send events to the UI: {error}");
+    }
+}
+
+fn now_ms() -> Timestamp {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as Timestamp)
+}
