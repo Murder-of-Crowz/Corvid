@@ -41,7 +41,7 @@ jobs:
 
   rust:
     name: Rust backend (Windows)
-    # rust-toolchain.toml pins the Windows MSVC toolchain, and Windows is the first target.
+    # Windows is the first target. Rustup picks the MSVC toolchain there, and check-version confirms it.
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
