@@ -1,5 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-mod log_reader;
+pub mod events;
+pub mod log_reader;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
