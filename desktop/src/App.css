@@ -90,8 +90,29 @@ button {
 }
 
 .live {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-left: auto;
+}
+
+.live-badge {
   color: var(--heal);
+}
+
+/* A button that reads as a link, like the log folder name. */
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.link:hover {
+  color: var(--text);
 }
 
 /* Buttons. A chip is a toggle, aria-pressed says whether it's on. */
@@ -102,6 +123,11 @@ button {
   border-radius: 6px;
   background: var(--surface-raised);
   cursor: pointer;
+}
+
+.button-primary {
+  padding: 6px 16px;
+  border-color: var(--accent);
 }
 
 .chip {
@@ -232,6 +258,21 @@ button {
 .tab[aria-current="page"] {
   background: var(--surface-raised);
   color: var(--text);
+}
+
+/* Shown until a combat log folder is chosen. */
+.choose-logs {
+  max-width: 46ch;
+  margin: auto;
+  padding: 24px 16px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.choose-logs-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .view-empty {
@@ -375,7 +416,7 @@ button {
   font-weight: normal;
 }
 
-.spellsl theah th {
+.spells thead th {
   color: var(--text-muted);
   font-weight: normal;
 }

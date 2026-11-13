@@ -39,6 +39,11 @@ export function formatPercent(share: number): string {
   return `${Math.round(share * 100)}%`
 }
 
+/** The last part of a folder path, i.e "C:\Games\Logs" > "Logs" */
+export function folderName(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+}
+
 /** 1 line of plain text describing the event. */
 export function describe(event: CorvidEvent): string {
   switch (event.type) {

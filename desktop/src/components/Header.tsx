@@ -1,21 +1,23 @@
 import { REPLAY_SPEEDS, replay, useReplayStatus } from "../data/feed";
-import { formatDuration } from "../lib/format";
+import { LogsDir } from "../data/logsDir";
+import { folderName, formatDuration } from "../lib/format";
 
 export type View = "meter" | "map" | "events";
 
 const VIEWS: { id: View, label: string }[] = [
   { id: "meter", label: "Meter" },
-  { id: "map", label: "Map "},
+  { id: "map", label: "Map" },
   { id: "events", label: "Events" },
 ];
 
 interface HeaderProps {
   view: View;
   onViewChange: (view: View) => void;
+  logsDir: LogsDir;
 }
 
 /** Title and view tabs, plus replay controls in the browser or a live badge in the app. */
-export function Header({ view, onViewChange }: HeaderProps) {
+export function Header({ view, onViewChange, logsDir }: HeaderProps) {
   const status = useReplayStatus();
 
   return (
@@ -57,9 +59,19 @@ export function Header({ view, onViewChange }: HeaderProps) {
             Restart
           </button>
         </div>
-      ) : (
-        <span className="live">Live</span>
-      )}
+      ) : logsDir.path ? (
+        <div className="live">
+          <span className="live-badge">Live</span>
+          <button
+            type="button"
+            className="link"
+            title={`Reading combat logs from ${logsDir.path}. Click to change.`}
+            onClick={logsDir.choose}
+          >
+            {folderName(logsDir.path)}
+          </button>
+        </div>
+      ) : null}
     </header>
   )
 }
