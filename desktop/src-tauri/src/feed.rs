@@ -1,6 +1,7 @@
-//! Sends new combat log lines to the UI while the app runs. For now each line
-//! goes out as a `rawLine` event; the parser will turn them into real events.
+//! Follows the combat log while the app runs, parses each new line, and sends
+//! the events to the UI.
 
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
@@ -8,8 +9,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tauri::{AppHandle, Emitter, Runtime};
 
-use crate::events::{CorvidEvent, EVENTS_CHANNEL, LogKind, RawLineEvent, Timestamp};
+use crate::events::{CorvidEvent, EVENTS_CHANNEL, Timestamp};
 use crate::log_reader::LogFollower;
+use crate::parser::Parser;
 
 // How often the log is checked for new lines.
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
@@ -39,6 +41,7 @@ fn follow<R: Runtime>(app: AppHandle<R>, folder: Option<PathBuf>, chosen: Receiv
         return;
     };
     let mut follower = LogFollower::new(folder);
+    let mut parser = Parser::new();
     let mut following: Option<PathBuf> = None;
     let mut last_error: Option<String> = None;
 
@@ -47,10 +50,13 @@ fn follow<R: Runtime>(app: AppHandle<R>, folder: Option<PathBuf>, chosen: Receiv
             follower = LogFollower::new(folder);
         }
 
+        let mut events = Vec::new();
         match follower.poll() {
             Ok(lines) => {
                 last_error = None;
-                send(&app, lines);
+                for line in &lines {
+                    parser.parse_line(line, &mut events)
+                }
             }
             Err(error) => {
                 let message = error.to_string();
@@ -60,35 +66,40 @@ fn follow<R: Runtime>(app: AppHandle<R>, folder: Option<PathBuf>, chosen: Receiv
                 last_error = Some(message);
             }
         }
+        parser.end_idle_fight(now_ms(), &mut events);
+        send(&app, events);
 
         if follower.current_path() != following.as_deref() {
             following = follower.current_path().map(Path::to_path_buf);
             if let Some(path) = &following {
                 println!("[corvid] following {}", path.display());
+                catch_up(&mut parser, path)
             }
         }
         thread::sleep(POLL_INTERVAL);
     }
 }
 
-/// Emits `lines` as `rawLine` events. Their `ts` is when Corvid read
-/// them; the game's own timestamp is still at the start of each line.
-fn send<R: Runtime>(app: &AppHandle<R>, lines: Vec<String>) {
-    if lines.is_empty() {
+
+/// Reads the zone and map from what `path` already holds. The game only writes
+/// them when a log starts or the player changes zone, and the follower starts
+/// at the end of a log that's already open.
+fn catch_up(parser: &mut Parser, path: &Path) {
+    match fs::read(path) {
+        Ok(bytes) => {
+            for line in String::from_utf8_lossy(&bytes).lines() {
+                parser.read_zone_and_map(line);
+            }
+        }
+        Err(error) => eprintln!("[corvid] couldn't read {}: {error}", path.display()),
+    }
+}
+
+fn send<R: Runtime>(app: &AppHandle<R>, events: Vec<CorvidEvent>) {
+    if events.is_empty() {
         return;
     }
-    let ts = now_ms();
-    let batch: Vec<CorvidEvent> = lines
-        .into_iter()
-        .map(|line| {
-            CorvidEvent::RawLine(RawLineEvent {
-                ts,
-                log: LogKind::Combat,
-                line,
-            })
-        })
-        .collect();
-    if let Err(error) = app.emit(EVENTS_CHANNEL, batch) {
+    if let Err(error) = app.emit(EVENTS_CHANNEL, events) {
         eprintln!("[corvid] couldn't send events to the UI: {error}");
     }
 }

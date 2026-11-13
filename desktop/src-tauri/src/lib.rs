@@ -1,6 +1,7 @@
 pub mod events;
 pub mod feed;
 pub mod log_reader;
+pub mod parser;
 pub mod settings;
 
 use std::path::PathBuf;
