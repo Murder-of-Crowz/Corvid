@@ -106,10 +106,25 @@ export function MapView() {
 
 /** A unit's trail, sample dots, and a pin where it is now. */
 function TrackMarks({ track, unit, className }: { track: Track; unit: number; className: string }) {
+  const segments = trailSegments(track.points, TRAIL_BREAK_MS)
   const last = track.points[track.points.length - 1];
   return (
     <g className={className}>
-      {trailSegments(track.points, TRAIL_BREAK_MS).map((segment) => (
+      {segments.slice(1).map((segment, i) => {
+        const from = segments[i][segments[i].length -1];
+        const to = segment[0];
+        return (
+          <line
+            key={`gap${to.ts}`}
+            className="map-gap"
+            x1={from.x * MAP_WIDTH}
+            y1={from.y * MAP_HEIGHT}
+            x2={to.x * MAP_WIDTH}
+            y2={to.y * MAP_HEIGHT}
+          />
+        );
+      })}
+      {segments.map((segment) => (
         <polyline
           key={segment[0].ts}
           className="map-trail"

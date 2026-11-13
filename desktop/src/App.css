@@ -421,6 +421,15 @@ button {
   gap: 4px 12px;
 }
 
+/* A straight line across a stretch with no positions. */
+.map-gap {
+  stroke: var(--track);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+  stroke-opacity: 0.5;
+  vector-effect: non-scaling-stroke;
+}
+
 .map-title {
   font-size: 16px;
   font-weight: 600;
