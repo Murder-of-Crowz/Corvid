@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import type { CorvidEvent } from "./event";
 
 const PUBLISH_INTERVAL_MS = 100;
-const MAX_EVENTS = 5000;
+export const MAX_EVENTS = 5000;
 
 export interface FeedSnapshot {
   events: readonly CorvidEvent[];
@@ -33,13 +33,11 @@ class EventStore {
   }
 
   /** Clears everything, i.e. when the replay restarts */
-  reset(): void {
+  reset(events: readonly CorvidEvent[] = []): void {
     if (this.timer !== null) clearTimeout(this.timer);
-    this.timer = null;
-    this.events = [];
-    this.total = 0;
-    this.snapshot = EMPTY;
-    this.emit();
+    this.events = events.slice(-MAX_EVENTS);
+    this.total = events.length;
+    this.publish();
   }
 
   /** Arrow props so React can call them unbound */

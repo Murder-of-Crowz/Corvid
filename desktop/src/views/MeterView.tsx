@@ -28,7 +28,7 @@ export function MeterView() {
   return (
     <section className={`meter meter-${mode}`}>
       <select
-        className="meter-fight"
+        className="select meter-fight"
         aria-label="Fight"
         value={pinnedId ?? ""}
         onChange={(e) => setPinnedId(e.target.value || null)}

@@ -13,6 +13,14 @@ export function formatClock(ts: number): string {
   return clock.format(ts);
 }
 
+/** "WoWCombatLog-111326_144055.txt" > "11/13/26 14:40", from the time the game put in the name */
+export function logLabel(name: string): string {
+  const match = /^WoWCombatLog-(\d\d)(\d\d)(\d\d)_(\d\d)(\d\d)\d\d\.txt$/.exec(name);
+  if (!match) return name;
+  const [, month, day, year, hour, minute] = match;
+  return `${month}/${day}/${year} ${hour}:${minute}`;
+}
+
 /** 12345 > 12,345 */
 export function formatNumber(n: number): string {
   return whole.format(n);

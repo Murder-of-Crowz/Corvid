@@ -33,6 +33,32 @@ export function useLogsDir(): LogsDir {
   return { path, choose };
 }
 
+export interface CombatLogs {
+  names: string[];
+  refresh: () => void;
+}
+
+/** The combat logs in `folder`, newest first, for the replay picker. */
+export function useCombatLogs(folder: string | null | undefined): CombatLogs {
+  const [names, setNames] = useState<string[]>([]);
+  const [asked, setAsked] = useState(0);
+
+  useEffect(() => {
+    if (!isTauri() || !folder) return;
+    let current = true;
+    invoke<string[]>("list_logs")
+      .then((found) => {
+        if (current) setNames(found);
+      })
+      .catch((error: unknown) => console.error("[corvid] the combat logs coulndn't be listed", error))
+    return () => {
+      current = false;
+    };
+  }, [folder, asked])
+  
+  return { names, refresh: () => setAsked((n) => n + 1) };
+}
+
 function report(error: unknown) {
   console.error("[corvid] the combat log folder couldn't be loaded or saved", error);
 }

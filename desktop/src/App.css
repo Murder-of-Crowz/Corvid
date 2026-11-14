@@ -106,24 +106,15 @@ button {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  margin-left: auto;
 }
 
-.replay-time {
-  min-width: 10ch;
-  text-align: center;
+.replay-progress {
+  margin: 0 6px;
   font-variant-numeric: tabular-nums;
 }
 
-.live {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.header-folder {
   margin-left: auto;
-}
-
-.live-badge {
-  color: var(--heal);
 }
 
 /* A button that reads as a link, like the log folder name. */
@@ -151,6 +142,11 @@ button {
   cursor: pointer;
 }
 
+.button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .button-primary {
   padding: 6px 16px;
   border-color: var(--accent);
@@ -167,6 +163,16 @@ button {
 .chip[aria-pressed="false"] {
   background: transparent;
   color: var(--text-muted);
+}
+
+/* Dropdowns */
+.select {
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  font: inherit;
+  color: inherit;
 }
 
 .chip-count {
@@ -304,12 +310,6 @@ button {
 /* Full width, so the picker doesn't grow as longer fight names appear.*/
 .meter-fight {
   width: 100%;
-  padding: 4px 8px;
-  border: 1px solod var(--border);
-  border-radius: 6px;
-  background: var(--surface-raised);
-  font: inherit;
-  color: inherit;
 }
 
 .meter-modes {
@@ -318,6 +318,7 @@ button {
 }
 
 .meter-title {
+  margin: 0;
   font-size: 16px;
   font-weight: 600;
 }
