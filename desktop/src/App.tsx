@@ -24,8 +24,8 @@ export default function App() {
         <main className="dashboard">
           <MapView />
           <div className="side">
-            <EventsView />
             <MeterView />
+            <EventsView />
           </div>
         </main>
       )}
