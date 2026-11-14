@@ -1,7 +1,16 @@
 import { useMemo, useState } from "react";
 import { useEventFeed } from "../data/store";
-import { boundsOf, buildMapState, trailSegments, type Bounds, type Track } from "../data/tracks";
+import {
+  boundsOf,
+  buildMapState,
+  encounterMarks,
+  trailSegments,
+  type Bounds,
+  type EncounterMark,
+  type Track,
+} from "../data/tracks";
 import { formatClock, formatCoord } from "../lib/format";
+import { buildFights } from "../data/fights";
 
 /** Drawn tat the game's world map size, so 0-1 coordinates keep the zone' shape. */
 const MAP_WIDTH = 1002;
@@ -41,6 +50,10 @@ export function MapView() {
   const { events } = useEventFeed();
   const [zoom, setZoom] = useState<Zoom>("close");
   const state = useMemo(() => buildMapState(events), [events]);
+  const marks = useMemo(
+    () => (state ? encounterMarks(buildFights(events), state.self.points) : []),
+    [events, state],
+  );
 
   if (!state) {
     return (
@@ -98,15 +111,22 @@ export function MapView() {
         {state.others.map((track) => (
           <TrackMarks key={track.unit.guid} track={track} unit={unit} className="map-party" />
         ))}
-        <TrackMarks track={state.self} unit={unit} className="map-self" />
+        <TrackMarks track={state.self} unit={unit} className="map-self"  marks={marks} />
       </svg>
     </section>
   );
 }
 
-/** A unit's trail, sample dots, and a pin where it is now. */
-function TrackMarks({ track, unit, className }: { track: Track; unit: number; className: string }) {
-  const segments = trailSegments(track.points, TRAIL_BREAK_MS)
+interface TrackMarksProps {
+  track: Track;
+  unit: number;
+  className: string;
+  marks?: EncounterMark[];
+}
+
+/** A unit's trail, a pin where it is now, and numbered encounters. */
+function TrackMarks({ track, unit, className, marks = [] }: TrackMarksProps) {
+  const segments = trailSegments(track.points, TRAIL_BREAK_MS);
   const last = track.points[track.points.length - 1];
   return (
     <g className={className}>
@@ -131,12 +151,20 @@ function TrackMarks({ track, unit, className }: { track: Track; unit: number; cl
           points={segment.map((p) => `${p.x * MAP_WIDTH},${p.y * MAP_HEIGHT}`).join(" ")}
         />
       ))}
-      {track.points.map((p) => (
-        <circle key={p.ts} className="map-sample" cx={p.x * MAP_WIDTH} cy={p.y * MAP_HEIGHT} r={2 * unit} />
-      ))}
       <circle className="map-pin" cx={last.x * MAP_WIDTH} cy={last.y * MAP_HEIGHT} r={7 * unit}>
         <title>{`${track.unit.name} ${formatCoord(last.x)}, ${formatCoord(last.y)}`}</title>
       </circle>
+      {marks.map((mark, i) => (
+        <g
+          key={mark.number}
+          className={i === marks.length -1 ? "map-mark map-mark-latest" : "map-mark"}
+          transform={`translate(${mark.x * MAP_WIDTH} ${mark.y * MAP_HEIGHT}) scale(${unit})`}
+        >
+          <title>{`${mark.number}. ${mark.name}`}</title>
+          <circle r={9} />
+          <text dy="0.35em">{mark.number}</text>
+        </g>
+      ))}
     </g>
   );
 }

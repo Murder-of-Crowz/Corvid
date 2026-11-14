@@ -1,4 +1,5 @@
 import type { CorvidEvent, Unit } from "./event";
+import type { Fight } from "./fights";
 
 export interface TrackPoint {
   ts: number;
@@ -66,6 +67,29 @@ export function trailSegments(points: readonly TrackPoint[], maxGapMs: number): 
   }
   if (current.length > 0) segments.push(current);
   return segments;
+}
+
+export interface EncounterMark {
+  number: number;
+  name: string;
+  x: number;
+  y: number;
+}
+
+/**
+ * Where you were when each fight started, numbered from 1 for the oldest. A 
+ * fight with none of your positions from just before it on is left out, but keeps
+ * its number. Positions come at most once a second, so the one taken at the fight's 
+ * first hit can be up to a second early.
+ */
+export function encounterMarks(fights: readonly Fight[], points: readonly TrackPoint[]): EncounterMark[] {
+  const marks: EncounterMark[] = [];
+  fights.forEach((fight, i) => {
+    const end = fight.end ?? Infinity;
+    const point = points.find((p) => p.ts >= fight.start - 1000 && p.ts <= end);
+    if (point) marks.push({ number: i + 1, name: fight.name, x: point.x, y: point.y });
+  });
+  return marks;
 }
 
 export interface Bounds {

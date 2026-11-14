@@ -481,9 +481,28 @@ button {
   vector-effect: non-scaling-stroke;
 }
 
-.map-sample {
+/* Numbered where each fight started */
+.map-mark circle {
+  fill: var(--surface-raised);
+  stroke: var(--track);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.map-mark text {
+  fill: var(--text);
+  font-size: 10px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.map-mark-latest circle {
   fill: var(--track);
-  fill-opacity: 0.6;
+  stroke: var(--bg);
+}
+
+.map-mark-latest text {
+  fill: var(--bg);
 }
 
 .map-pin {
