@@ -4,12 +4,14 @@ pub mod log_reader;
 pub mod parser;
 pub mod settings;
 
+use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
 use tauri::{AppHandle, Manager, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
+use events::CorvidEvent;
 use feed::Feed;
 use settings::Settings;
 
@@ -57,6 +59,30 @@ async fn choose_logs_dir(
     Ok(Some(folder))
 }
 
+#[tauri::command]
+fn list_logs(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    let Some(folder) = logs_dir(state) else {
+        return Ok(Vec::new());
+    };
+    let logs = log_reader::combat_logs(&folder).map_err(|error| error.to_string())?;
+    Ok(logs
+        .iter()
+        .filter_map(|path| Some(path.file_name()?.to_str()?.to_string()))
+        .collect())
+}
+
+#[tauri::command]
+async fn read_log(name: String, state: State<'_, AppState>) -> Result<Vec<CorvidEvent>, String> {
+    let folder = logs_dir(state).ok_or("no combat log folder has been chosen")?;
+    let path = log_reader::combat_logs(&folder)
+        .map_err(|error| error.to_string())?
+        .into_iter()
+        .find(|path| path.file_name().is_some_and(|file| file == name.as_str()))
+        .ok_or_else(|| format!("{name} isn't a combat log in {}", folder.display()))?;
+    let bytes = fs::read(&path).map_err(|error| format!("couldn't read {name}: {error}"))?;
+    Ok(parser::parse_log(&String::from_utf8_lossy(&bytes)))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -73,7 +99,12 @@ pub fn run() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![logs_dir, choose_logs_dir])
+        .invoke_handler(tauri::generate_handler![
+            logs_dir,
+            choose_logs_dir,
+            list_logs,
+            read_log
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

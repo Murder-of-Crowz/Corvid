@@ -5,7 +5,6 @@
 use std::fs::{self, File};
 use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
 
 /// Combat log names start with this. Forever adds a timestamp before ".txt".
 const LOG_PREFIX: &str = "WoWCombatLog";
@@ -54,15 +53,16 @@ impl LogFollower {
     }
 }
 
-/// The combat log the game wrote to most recently, if the folder has any.
-pub fn newest_log(folder: &Path) -> io::Result<Option<PathBuf>> {
+/// Every combat log in the folder, the one written to most recently first.
+/// A missing folder has none.
+pub fn combat_logs(folder: &Path) -> io::Result<Vec<PathBuf>> {
     let entries = match fs::read_dir(folder) {
         Ok(entries) => entries,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
         Err(error) => return Err(error),
     };
 
-    let mut newest: Option<(SystemTime, PathBuf)> = None;
+    let mut logs = Vec::new();
     for entry in entries {
         let path = entry?.path();
         let is_log = path
@@ -73,18 +73,19 @@ pub fn newest_log(folder: &Path) -> io::Result<Option<PathBuf>> {
             continue;
         }
         // Ask the file itself: on Windows, the times in a directory listing can
-        // lag behind while the game holds the file open. Skip files that vanish.
+        // lag behind while the game holds the file open. Skip the files that vanish.
         let Ok(modified) = fs::metadata(&path).and_then(|meta| meta.modified()) else {
             continue;
         };
-        if newest
-            .as_ref()
-            .is_none_or(|(time, best)| (modified, &path) > (*time, best))
-        {
-            newest = Some((modified, path));
-        }
+        logs.push((modified, path));
     }
-    Ok(newest.map(|(_, path)| path))
+    logs.sort_by(|a, b| b.cmp(a));
+    Ok(logs.into_iter().map(|(_, path)| path).collect())
+}
+
+// The combat log the game wrote to most recently, if the folder has any.
+pub fn newest_log(folder: &Path) -> io::Result<Option<PathBuf>> {
+    Ok(combat_logs(folder)?.into_iter().next())
 }
 
 struct OpenLog {

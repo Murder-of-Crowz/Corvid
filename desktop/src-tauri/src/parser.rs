@@ -314,6 +314,17 @@ impl Parser {
     }
 }
 
+///Every event in a whole log, for replays. A fight still going at the end is ended.
+pub fn parse_log(text: &str) -> Vec<CorvidEvent> {
+    let mut parser = Parser::new();
+    let mut events = Vec::new();
+    for line in text.lines() {
+        parser.parse_line(line, &mut events);
+    }
+    parser.end_fight(&mut events);
+    events
+}
+
 /// Splits a line into its timestamp and fields. Lines look like
 /// `11/5/2026 23:17:28.943-8 SWING_DAMAGE,Player...,"Name-...",0x511,...`.
 fn split_line(line: &str) -> Option<(Timestamp, Vec<&str>)> {
