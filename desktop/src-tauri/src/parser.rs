@@ -218,7 +218,11 @@ impl Parser {
         } else {
             &source
         };
-        let fight_id = self.join_fight(ts, enemy, events);
+        let fight_id = if enemy.affiliation == Affiliation::Outsider {
+            Some(self.join_fight(ts, enemy, events))
+        } else {
+            None
+        };
         let spell = if f[0] == "SWING_DAMAGE" {
             None
         } else {
@@ -226,7 +230,7 @@ impl Parser {
         };
         events.push(CorvidEvent::Combat(CombatEvent::Damage(DamageEvent {
             ts,
-            fight_id: Some(fight_id),
+            fight_id,
             source,
             target,
             spell,
