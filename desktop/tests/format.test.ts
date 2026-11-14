@@ -3,6 +3,7 @@ import type { Unit } from "../src/data/event";
 import {
   describe as describeEvent,
   folderName,
+  logLabel,
   formatCoord,
   formatDuration,
   formatPercent,
@@ -61,5 +62,12 @@ describe("folderName", () => {
     expect(folderName("D:\\Games\\Logs\\")).toBe("Logs");
     expect(folderName("/home/me/wow/Logs")).toBe("Logs");
     expect(folderName("C:\\")).toBe("C:");
+  });
+});
+
+describe("logLabel", () => {
+  it("reads the date and time from the log's name", () => {
+    expect(logLabel("WoWCombatLog-111326_144055.txt")).toBe("11/13/26 14:40");
+    expect(logLabel("WoWCombatLog.txt")).toBe("WoWCombatLog.txt");
   });
 });

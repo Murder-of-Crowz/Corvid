@@ -1,7 +1,7 @@
 //! The combat log parser, on lines shaped like the real Forever logs. The
 //! other players and mobs here are made up.
 
-use desktop_lib::parser::Parser;
+use desktop_lib::parser::{Parser, parse_log};
 use serde_json::{Value, json, to_value};
 
 const ME_GUID: &str = "Player-6929-00F21447";
@@ -148,6 +148,26 @@ fn damage_to_the_player_starts_a_fight_too() {
     assert_eq!(events[0]["name"], "Mindless Zombie");
     assert_eq!(events[1]["source"], zombie());
     assert_eq!(events[1]["target"], me());
+}
+
+#[test]
+fn thorns_counts_as_damage() {
+    // The game logs damage shields as DAMAGE_SHIELD, from the shield's holder
+    // to whoever struck them. Its advanced params describe the target.
+    let info = advanced(ZOMBIE_GUID, 1860.39, 1406.69);
+    let thorns = format!(
+        r#"DAMAGE_SHIELD,{ME},{ZOMBIE},782,"Thorns",0x8,{info},6,6,-1,8,0,0,0,nil,nil,nil,ST"#
+    );
+    let events = parse(&[
+        at("23:17:44.947", &swing(ZOMBIE, ZOMBIE_GUID, ME, 2)),
+        at("23:17:44.947", &thorns),
+    ]);
+    assert_eq!(kinds(&events), ["fightStart", "damage", "damage"]);
+    assert_eq!(events[2]["fightId"], events[0]["fightId"]);
+    assert_eq!(events[2]["source"], me());
+    assert_eq!(events[2]["target"], zombie());
+    assert_eq!(events[2]["spell"], json!({ "id": 782, "name": "Thorns" }));
+    assert_eq!(events[2]["amount"], 6);
 }
 
 #[test]
@@ -398,4 +418,21 @@ fn lines_it_cant_use_are_skipped() {
         format!("someday  {hit}"),
     ]);
     assert!(events.is_empty(), "{events:?}");
+}
+
+#[test]
+fn a_whole_log_ends_its_last_fight() {
+    // A replay reads the whole log at once, so no later line or timer ends the last fight.
+    let lines = [
+        at("23:17:29.943", ZONE),
+        at("23:17:29.944", MAP),
+        at("23:17:44.947", &fireball(ME, ZOMBIE, ZOMBIE_GUID, 20, 8)),
+    ];
+    let events: Vec<Value> = parse_log(&lines.join("\n"))
+        .iter()
+        .map(|event| to_value(event).unwrap())
+        .collect();
+    assert_eq!(kinds(&events), ["fightStart", "damage", "fightEnd"]);
+    assert_eq!(events[2]["ts"], HIT + 1);
+    assert!(parse_log("").is_empty());
 }

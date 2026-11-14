@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CorvidEvent, Unit } from "../src/data/event";
-import { boundsOf, buildMapState, trailSegments } from "../src/data/tracks";
+import type { Fight } from "../src/data/fights";
+import { boundsOf, buildMapState, encounterMarks, trailSegments } from "../src/data/tracks";
 import { sampleEvents } from "./sample";
 
 describe("buildMapState", () => {
@@ -61,5 +62,29 @@ describe("boundsOf", () => {
     ];
     expect(boundsOf(points)).toEqual({ minX: 0.33, minY: 0.65, maxX: 0.37, maxY: 0.69 });
     expect(boundsOf([])).toBeNull();
+  });
+});
+
+describe("encounterMarks", () => {
+  it("numbers each fight from the oldest, where you were when it started", () => {
+    const fight = (name: string, start: number, end?: number): Fight =>
+      ({ id: name, name, kind: "trash", start, end, events: [] });
+    const points = [
+      { ts: 9_500, x: 0.1, y: 0.1 }, // half a second before the first hit
+      { ts: 12_000, x: 0.2, y: 0.2 },
+      { ts: 70_000, x: 0.5, y: 0.5 },
+    ];
+    const marks = encounterMarks(
+      [
+        fight("Zombie", 10_000, 15_000),
+        fight("Bat", 40_000, 45_000), // no position during it, so no mark
+        fight("Spider", 70_000), // still going
+      ],
+      points,
+    );
+    expect(marks).toEqual([
+      { number: 1, name: "Zombie", x: 0.1, y: 0.1 },
+      { number: 3, name: "Spider", x: 0.5, y: 0.5 },
+    ]);
   });
 });

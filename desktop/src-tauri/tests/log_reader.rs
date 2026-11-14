@@ -1,6 +1,6 @@
 //! Tests the combat log follower on real files in a temporary folder.
 
-use desktop_lib::log_reader::{LogFollower, newest_log};
+use desktop_lib::log_reader::{LogFollower, combat_logs, newest_log};
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -162,4 +162,34 @@ fn only_counts_combat_logs() {
     }
 
     assert_eq!(newest_log(&dir.0).unwrap(), Some(combat));
+}
+
+#[test]
+fn lists_every_combat_log_newest_first() {
+    let dir = TempDir::new("list");
+    let start = SystemTime::now() - Duration::from_secs(600);
+    for (minutes, name) in [
+        (1, "WoWCombatLog-110526_231729.txt"),
+        (3, "WoWCombatLog-110726_214017.txt"),
+        (2, "WoWCombatLog-110626_060352.txt"),
+        (4, "WoWChatLog.txt"),
+    ] {
+        write(&dir.file(name), "x\n");
+        set_modified(&dir.file(name), start + Duration::from_secs(60 * minutes));
+    }
+
+    let names: Vec<_> = combat_logs(&dir.0)
+        .unwrap()
+        .iter()
+        .map(|path| path.file_name().unwrap().to_owned())
+        .collect();
+    assert_eq!(
+        names,
+        [
+            "WoWCombatLog-110726_214017.txt",
+            "WoWCombatLog-110626_060352.txt",
+            "WoWCombatLog-110526_231729.txt",
+        ]
+    );
+    assert!(combat_logs(&dir.file("not-there")).unwrap().is_empty());
 }
