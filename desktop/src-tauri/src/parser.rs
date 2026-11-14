@@ -82,7 +82,9 @@ impl Parser {
         let advanced = if event.starts_with("SWING_") { 9 } else { 12 };
 
         match event {
-            "SWING_DAMAGE" | "RANGE_DAMAGE" | "SPELL_DAMAGE" | "SPELL_PERIODIC_DAMAGE" => {
+            "SWING_DAMAGE" | "RANGE_DAMAGE" | "SPELL_DAMAGE" | "SPELL_PERIODIC_DAMAGE" 
+            // Thorns and other damage shield hit whoever strikes their holder.
+            | "DAMAGE_SHIELD" => {
                 self.add_position(ts, &f, advanced, &source, &target, events);
                 if involves_me {
                     self.add_damage(ts, &f, advanced, source, target, events);
