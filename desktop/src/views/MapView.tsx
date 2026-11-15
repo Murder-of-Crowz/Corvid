@@ -17,17 +17,34 @@ const MAP_WIDTH = 1002;
 const MAP_HEIGHT = 668;
 
 const TRAIL_BREAK_MS = 30_000;
-const CLOSE_MIN_SPAN = 0.04;
+const CLOSE_MIN_SPAN = 0.12;
 const CLOSE_PADDING = 0.01;
 
 interface MapInfo {
   name: string;
-  image?: string;
+  zoneId?: number;
 }
 
 const MAPS: Record<number, MapInfo> = {
-  1420: { name: "Tirisfal Glades" },
+  1420: { name: "Tirisfal Glades", zoneId: 85 },
 };
+
+/**
+ * Zone maps exported from the game with wow.export (for testing), which names
+ * them Zone_<zoneId>_<name>.png. They're Blizzard's art. so they stay in the
+ * .gitignored WTF/Zones folder. A zone without one is drawn on a plain grid.
+ */
+const ZONE_IMAGES = import.meta.glob<string>("../../../WTF/Zones/Zone_*.png", {
+  eager: true,
+  query: "?url",
+  import: "default",
+});
+
+function zoneImage(zoneId: number | undefined): string | undefined {
+  if (zoneId === undefined) return undefined;
+  const prefix = `/Zone_${zoneId}_`
+  return Object.entries(ZONE_IMAGES).find(([path]) => path.includes(prefix))?.[1];
+}
 
 type Zoom = "close" | "zone";
 
@@ -64,6 +81,7 @@ export function MapView() {
   }
 
   const map = MAPS[state.mapId] ?? { name: `Map ${state.mapId}` };
+  const image = zoneImage(map.zoneId);
   const here = state.self.points[state.self.points.length -1];
   const everyone = [state.self, ...state.others];
   const bounds = boundsOf(everyone.flatMap((track) => track.points));
@@ -99,14 +117,19 @@ export function MapView() {
         role="img"
         aria-label={`Map of ${map.name} with your trail`}
       >
-        {map.image && <image href={map.image} x={0} y={0} width={MAP_WIDTH} height={MAP_HEIGHT} />}
+        {image && <image href={image} x={0} y={0} width={MAP_WIDTH} height={MAP_HEIGHT} />}
         <rect className="map-edge" x={0} y={0} width={MAP_WIDTH} height={MAP_HEIGHT} />
-        {gridLines(view.x / MAP_WIDTH, (view.x + view.w) / MAP_WIDTH, step).map((x) => (
-          <line key={`x${x}`} className="map-grid" x1={x * MAP_WIDTH} x2={x * MAP_WIDTH} y1={0} y2={MAP_HEIGHT} />
-        ))}
-        {gridLines(view.y / MAP_HEIGHT, (view.y + view.h) / MAP_HEIGHT, step).map((y) => (
-          <line key={`y${y}`} className="map-grid" x1={0} x2={MAP_WIDTH} y1={y * MAP_HEIGHT} y2={y * MAP_HEIGHT} />
-        ))}
+        
+        {!image && (
+          <>
+            {gridLines(view.x / MAP_WIDTH, (view.x + view.w) / MAP_WIDTH, step).map((x) => (
+            <line key={`x${x}`} className="map-grid" x1={x * MAP_WIDTH} x2={x * MAP_WIDTH} y1={0} y2={MAP_HEIGHT} />
+            ))}
+            {gridLines(view.y / MAP_HEIGHT, (view.y + view.h) / MAP_HEIGHT, step).map((y) => (
+              <line key={`y${y}`} className="map-grid" x1={0} x2={MAP_WIDTH} y1={y * MAP_HEIGHT} y2={y * MAP_HEIGHT} />
+            ))}
+          </>
+        )}
 
         {state.others.map((track) => (
           <TrackMarks key={track.unit.guid} track={track} unit={unit} className="map-party" />
