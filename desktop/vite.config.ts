@@ -32,7 +32,7 @@ export default defineConfig(() => ({
     // 4. the browser replay loads ../fixtures. Allow only that folder, so the
     //    real logs in WTF/ cannot be served.
     fs: {
-      allow: [".", "../fixtures", "..WTF/Zones"],
+      allow: [".", "../fixtures", "../WTF/Zones"],
     },
   },
 

@@ -4,7 +4,7 @@ Corvid is a Windows desktop companion and Lua addon for World of Warcraft: Forev
 
 The desktop app shows everything on one screen: a map with your trail and numbered fights, a damage and healing meter with a per-spell breakdown, and a list of raw events. The Rust backend follows the newest combat log as WoW writes it and sends events to the UI through the contract in `desktop/src/data/event.ts`. You can also replay any earlier log from the header, even while you play. In a browser, the UI replays a recorded sample session instead, so you can work on it without Rust or the game. The addon attempts to enable advanced combat logging on world entry, and `/corvid` checks which player and party positions the game returns.
 
-Next is a map image for the first zone, so the trail can be checked against known locations.
+The map draws the zone under your trail, from a map image you export from your own game files. Tirisfal Glades and Silverpine Forest are set up so far. Other zones are drawn on a grid.
 
 | Folder | Contents |
 | --- | --- |
@@ -18,6 +18,7 @@ Next is a map image for the first zone, so the trail can be checked against know
 | `desktop/src-tauri/src/` | Log follower, combat log parser, live feed, settings, and the commands the UI calls |
 | `desktop/src-tauri/tests/` | Rust tests |
 | `fixtures/events/` | Sample session for the browser replay and the tests, built locally and not committed |
+| `WTF/` | Your own combat logs in `CombatLog/` and exported zone maps in `Zones/`, kept locally and not committed |
 | `scripts/` | Version check, and the script that builds the sample session |
 | `.github/workflows/` | CI |
 
@@ -100,7 +101,20 @@ Events keep their real times from the log. Live events keep arriving in the back
 
 ### The map
 
-Numbered circles mark where each fight started, counting from 1 for the oldest. The latest is filled in, and hovering one shows who the fight was against. The log only has positions during combat, so dashed lines join the trail across the stretches between fights. There's no map image yet, so the trail is drawn on a grid. **Close-up** fits the view to the trail and **Whole zone** shows the full zone.
+Numbered circles mark where each fight started, counting from 1 for the oldest. The latest is filled in, and hovering one shows who the fight was against. The log only has positions during combat, so dashed lines join the trail across the stretches between fights. **Close-up** fits the view to the trail and **Whole zone** shows the full zone.
+
+Behind the trail is the zone's map, if you've exported its image. A zone without one is drawn on a grid. Positions from the log land on the right spots on the image with no adjustment.
+
+#### Add a zone map
+
+The map art belongs to Blizzard, so it isn't in the repo. Never commit it or ship it in a build. Each developer exports their own from their game install:
+
+1. Use [wow.export](https://github.com/Kruithne/wow.export) on your WoW install to export the zone's map as a PNG. It names the file `Zone_<zoneId>_<Name>.png`, such as `Zone_85_Tirisfal_Glades.png`, at 1002×668, the size the map is drawn at.
+2. Put the file in the repo's `WTF/Zones/` folder, which is gitignored.
+3. The log doesn't use the zone ID in the file name. It names maps by their uiMapID instead, such as `1420` on `MAP_CHANGE` lines. If the zone isn't in `MAPS` in `desktop/src/views/MapView.tsx` yet, add a line that pairs the two, like `1420: { name: "Tirisfal Glades", zoneId: 85 }`.
+4. Restart `npm run tauri dev` or `npm run dev` to pick up the new image.
+
+A build bundles every image in `WTF/Zones/` into the app. Empty the folder before building anything you'll give to someone else.
 
 ### How fights are read from the log
 
@@ -147,7 +161,7 @@ The UI also calls four Tauri commands. `logs_dir` and `choose_logs_dir` get and 
 
 The script writes `fixtures/events/sample-session.json` unless you pass a different output path as a second argument. It also shortens idle stretches so the replay doesn't sit still between fights. Each developer builds their own, and `fixtures/events/` is gitignored, so the file is never committed.
 
-Don't commit raw combat logs either. They contain other players' names. `WTF/` and `WoWCombatLog*.txt` are gitignored.
+Don't commit raw combat logs either. They contain other players' names. `WTF/` and `WoWCombatLog*.txt` are gitignored. Outside `desktop/`, the dev server only serves `fixtures/` and `WTF/Zones/`, so a page can't fetch your logs in `WTF/CombatLog/`.
 
 ## Tests
 
@@ -196,7 +210,7 @@ cargo check --locked --manifest-path src-tauri/Cargo.toml
 npm run tauri build -- --debug --no-bundle
 ```
 
-The first command runs the tests once. The second checks TypeScript, including the tests, and builds the Vite frontend into `dist/`. The Cargo command checks the Rust backend and fails if Cargo would need to change the lockfile. The last command builds the Windows debug executable without packaging an installer. To build a release installer, use `npm run tauri build`.
+The first command runs the tests once. The second checks TypeScript, including the tests, and builds the Vite frontend into `dist/`. The Cargo command checks the Rust backend and fails if Cargo would need to change the lockfile. The last command builds the Windows debug executable without packaging an installer. To build a release installer, use `npm run tauri build`. Builds include any zone maps in `WTF/Zones/`, so empty that folder before sharing one.
 
 ## CI
 
