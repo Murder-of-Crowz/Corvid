@@ -2,16 +2,21 @@
 
 Corvid is a Windows desktop companion and Lua addon for World of Warcraft: Forever. We’re building a combat log reader, a damage and healing meter, and a map that shows positions from combat events. The goal is to keep recent fights locally so players can review them after combat.
 
-The desktop UI has three views: a damage and healing meter with a per-spell breakdown, a map with your trail and position, and a raw event list. It reads events from the Rust backend through the contract in `desktop/src/data/event.ts`. Until the Rust log reader sends events, you can work on the UI in a browser, where it replays a recorded session. The addon attempts to enable advanced combat logging on world entry, and `/corvid` checks which player and party positions the game returns. The next milestone is the Rust log reader, which will send new combat log events to the UI while WoW is running.
+The desktop app shows everything on one screen: a map with your trail and numbered fights, a damage and healing meter with a per-spell breakdown, and a list of raw events. The Rust backend follows the newest combat log as WoW writes it and sends events to the UI through the contract in `desktop/src/data/event.ts`. You can also replay any earlier log from the header, even while you play. In a browser, the UI replays a recorded sample session instead, so you can work on it without Rust or the game. The addon attempts to enable advanced combat logging on world entry, and `/corvid` checks which player and party positions the game returns.
+
+Next is a map image for the first zone, so the trail can be checked against known locations.
 
 | Folder | Contents |
 | --- | --- |
 | `addon/` | `Corvid.toc` and `Corvid.lua` |
 | `desktop/src/` | React + TypeScript UI, built with Vite |
-| `desktop/src/data/` | Event contract, event store, event feed, and the fight and map calculations |
+| `desktop/src/components/` | Header with the log picker and replay controls, and the log folder prompt |
+| `desktop/src/data/` | Event contract, event store, live and replay feed, log folder, and the fight and map calculations |
 | `desktop/src/views/` | Meter, map, and events views |
 | `desktop/tests/` | Vitest tests |
 | `desktop/src-tauri/` | Rust backend and Tauri configuration |
+| `desktop/src-tauri/src/` | Log follower, combat log parser, live feed, settings, and the commands the UI calls |
+| `desktop/src-tauri/tests/` | Rust tests |
 | `fixtures/events/` | Sample session for the browser replay and the tests, built locally and not committed |
 | `scripts/` | Version check, and the script that builds the sample session |
 | `.github/workflows/` | CI |
@@ -72,6 +77,39 @@ Run `npm run check-version` from the repo root after installing dependencies or 
 
 Install npm packages from `desktop/`, not the repo root. The root `package.json` only holds the `check-version` script.
 
+## Use the desktop app
+
+Type `/combatlog` in game to start logging. The map needs advanced combat logging, which puts positions in the log. The addon tries to turn it on for you.
+
+The first time the app starts, it asks for the folder WoW writes combat logs to, usually `_forever_\Logs` in the WoW install. It remembers the folder in `%APPDATA%\io.github.murder-of-crowz.corvid\settings.json`. To change it, click the folder name at the right of the header.
+
+### Live
+
+The dropdown in the header starts on **Live**. The app follows the newest `WoWCombatLog-*.txt` in the folder from its end, so fights from before the app started don't appear. Pick that log in the dropdown to see them. When the game starts a new log, the app reads the rest of the old one, then follows the new one from its start.
+
+### Replay a log
+
+The dropdown lists every combat log in the folder, newest first, by the date and time in its name, such as `11/13/26 14:40`. It looks for new logs each time you open it. Picking one loads the whole log and plays it from the start:
+
+- **Play** and **Pause**.
+- **Prev** and **Next** jump to the start of the previous or next encounter. **Prev** on the first one goes back to the start of the log.
+- **1x**, **4x**, and **20x** set the speed. Quiet stretches between fights are cut to 5 seconds.
+- **Encounter N / M** shows the current encounter, followed by the log time reached.
+
+Events keep their real times from the log. Live events keep arriving in the background during a replay, so you can review an old log while you play. Choosing **Live** again shows everything, including fights that finished in the meantime. The view never jumps to the latest on its own.
+
+### The map
+
+Numbered circles mark where each fight started, counting from 1 for the oldest. The latest is filled in, and hovering one shows who the fight was against. The log only has positions during combat, so dashed lines join the trail across the stretches between fights. There's no map image yet, so the trail is drawn on a grid. **Close-up** fits the view to the trail and **Whole zone** shows the full zone.
+
+### How fights are read from the log
+
+- Only lines that involve you become events. Fights between party members and mobs aren't tracked.
+- A fight starts with damage between you and an outsider, such as a mob, and is named after them. Any other enemy hit before it ends joins the same fight. It ends after 6 seconds with no damage.
+- Heals join the fight in progress but never start one. Damage within your own side, like Scorned by the Light hurting you, is kept as an event but belongs to no fight, so the meter doesn't count it.
+- Melee is logged twice, as `SWING_DAMAGE` and `SWING_DAMAGE_LANDED`, and counts once. Damage shields like Thorns are logged as `DAMAGE_SHIELD` and count as damage.
+- Your position is taken from your own events, at most once a second. It needs the zone's `MAP_CHANGE` line, which the app reads from earlier in the log when it starts partway through one.
+
 ## Work on the UI in a browser
 
 The UI runs without Rust or the game. In a browser, it replays a sample session built from one of your own combat logs, so build that first.
@@ -93,13 +131,15 @@ The UI runs without Rust or the game. In a browser, it replays a sample session 
    npm run dev
    ```
 
-Open <http://localhost:1420>. Outside Tauri, the app replays `fixtures/events/sample-session.json` as if it were happening live. The header has replay speed buttons (1, 4, and 20 times) and **Restart**. Inside the Tauri window, the same UI listens for events from Rust instead and shows **Live**.
+Open <http://localhost:1420>. Outside Tauri, the app replays `fixtures/events/sample-session.json` with the same controls as a replay in the app. The header shows **Sample session** in place of the log dropdown, since a browser can't read the log folder.
 
-If the header shows **Replay finished 0:00 / 0:00** and the views are empty, the sample session is missing. The developer console also logs `[corvid] No sample session`. Run step 2, then restart `npm run dev`.
+If the header shows **No encounters** and the views are empty, the sample session is missing. The developer console also logs `[corvid] No sample session`. Run step 2, then restart `npm run dev`.
 
 ## Event contract
 
-`desktop/src/data/event.ts` defines the events Rust sends to the UI. Rust emits batches (`CorvidEvent[]`) on the Tauri event `corvid://events`, with camelCase field names. On the Rust side, use `#[serde(tag = "type", rename_all = "camelCase")]`. The UI drops events that don't match the contract and logs a `[corvid]` warning in the developer console, so check the console first if events don't appear.
+`desktop/src/data/event.ts` defines the events Rust sends to the UI. Rust emits batches (`CorvidEvent[]`) on the Tauri event `corvid://events`, with camelCase field names. On the Rust side, use `#[serde(tag = "type", rename_all = "camelCase")]`. The UI drops events that don't match the contract and logs a `[corvid]` warning in the developer console, so check the console first if events don't appear. Under `npm run tauri dev`, right-click in the window and choose **Inspect** to open the console.
+
+The UI also calls four Tauri commands. `logs_dir` and `choose_logs_dir` get and set the log folder. `list_logs` returns the combat log names for the dropdown, and `read_log` returns one log's events as a single `CorvidEvent[]` for a replay. `read_log` only accepts names that `list_logs` returns, so the UI can't read files outside the folder.
 
 ## Sample session
 
@@ -117,9 +157,16 @@ From `desktop/`:
 npm test
 ```
 
-This reruns the tests each time you save a file. To run them once, use `npx vitest run`. Tests live in `desktop/tests/` as `*.test.ts` files and cover the event contract, text and number formatting, fight totals, and map trails. They need neither the game nor Rust.
+This reruns the tests each time you save a file. To run them once, use `npx vitest run`. Tests live in `desktop/tests/` as `*.test.ts` files and cover the event contract, text and number formatting, log names in the dropdown, fight totals, map trails and encounter markers, and the replay controls. They need neither the game nor Rust.
 
 Most tests use small made-up events. Four also run on your sample session, if you've built one, and check things that hold for any log, such as meter totals matching the raw events. Without a sample session, as in CI, those four are skipped.
+
+The Rust tests live in `desktop/src-tauri/tests/`. They cover the event JSON against the contract, the parser on lines shaped like real logs, following and listing logs on real files in a temporary folder, and saving the settings. Tauri embeds `desktop/dist` when it compiles, so build the frontend once first if `dist/` doesn't exist yet. From `desktop/`:
+
+```powershell
+npm run build
+cargo test --manifest-path src-tauri/Cargo.toml
+```
 
 ## Install and test the WoW addon
 
@@ -136,7 +183,7 @@ Most tests use small made-up events. Four also run on your sample session, if yo
 4. Type `/corvid` in game to check position reporting. After editing Lua, copy the updated file over and run `/reload`.
 5. Fight a mob and check the active client’s `Logs\` directory for the newest `WoWCombatLog*.txt` file. Forever can use timestamped filenames. If logging is off, `/combatlog` toggles it on.
 
-Run the desktop app separately in PowerShell. The combat log is the first data source the desktop app will read.
+The desktop app reads the combat log itself, so it runs without the addon. Without advanced combat logging, though, the log has no positions and the map stays empty.
 
 ## Build checks
 
