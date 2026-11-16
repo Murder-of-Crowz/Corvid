@@ -1,4 +1,4 @@
-import type { CorvidEvent, Unit } from "./event";
+import type { CorvidEvent, PositionEvent, Unit } from "./event";
 import type { Fight } from "./fights";
 
 export interface TrackPoint {
@@ -18,19 +18,20 @@ export interface MapState {
   others: Track[];
 }
 
+export function latestPosition(events: readonly CorvidEvent[]): PositionEvent | null {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const event = events[i];
+    if (event.type === "position" && event.unit.affiliation === "self" && event.unit.kind === "player") return event;
+  }
+  return null;
+}
+
 /**
  * Where you and your group have been on the map you're on now. Null
  * until your first positon arrives. Pets and strangers are left out.
  */
 export function buildMapState(events: readonly CorvidEvent[]): MapState | null {
-  let mapId: number | undefined;
-  for (let i = events.length - 1; i >= 0; i--) {
-    const event = events[i]
-    if (event.type === "position" && event.unit.affiliation === "self") {
-      mapId = event.mapId;
-      break;
-    }
-  }
+  const mapId = latestPosition(events)?.mapId;
   if (mapId === undefined) return null;
 
   const tracks = new Map<string, Track>();

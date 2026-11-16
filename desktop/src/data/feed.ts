@@ -1,8 +1,9 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useSyncExternalStore } from "react";
-import { EVENTS_CHANNEL, toEvents, type CorvidEvent } from "./event";
+import { EVENTS_CHANNEL, toEvents, type CorvidEvent, type PositionEvent } from "./event";
 import { eventStore, MAX_EVENTS } from "./store";
+import { latestPosition } from "./tracks";
 
 /**
  * Live event batches from the Rust BE. They are kept while a replay is
@@ -10,6 +11,8 @@ import { eventStore, MAX_EVENTS } from "./store";
  */
 class LiveSource {
   private events: CorvidEvent[] = [];
+  private position: PositionEvent | null = null;
+  private positionListeners = new Set<() => void>();
   private showing = false;
   private unlisten: (() => void) | null = null;
   private run = 0
@@ -18,10 +21,16 @@ class LiveSource {
     const run = ++this.run;
     const unlisten = await listen<unknown>(EVENTS_CHANNEL, (message) => {
       const batch = toEvents(message.payload, EVENTS_CHANNEL);
-      for (const event of batch) this.events.push(event);
+      const position = latestPosition(batch);
+      if (position) {
+        this.position = position;
+        for (const listener of this.positionListeners) listener();
+      }
+      const kept = batch.filter((event) => event.type !== "position" || event.source !== "strip");
+      for (const event of kept) this.events.push(event);
       const excess = this.events.length - MAX_EVENTS;
       if (excess > 0) this.events.splice(0, excess);
-      if (this.showing) eventStore.push(batch);
+      if (this.showing) eventStore.push(kept);
     });
     if (run === this.run) this.unlisten = unlisten;
     else unlisten();
@@ -41,6 +50,15 @@ class LiveSource {
 
   hide(): void {
     this.showing = false;
+  }
+
+  getPosition = (): PositionEvent | null => this.position;
+
+  subscribePosition = (listener: () => void): (() => void) => {
+    this.positionListeners.add(listener);
+    return () => {
+      this.positionListeners.delete(listener);
+    }
   }
 }
 
@@ -265,6 +283,16 @@ export function watch(log: string | null): void {
 /** The replay's status, or null while live. */
 export function useReplayStatus(): ReplayStatus | null {
   return useSyncExternalStore(replay.subscribe, replay.getStatus);
+}
+
+/** A browser has no live feed, so there the live map follows the sample replay. */
+const positions = live
+  ? { subscribe: live.subscribePosition, get: live.getPosition }
+  : { subscribe: eventStore.subscribe, get: () => latestPosition(eventStore.getSnapshot().events) };
+
+/** Your newest live position, even while a replay is showing. Null until the first one. */
+export function useLivePosition(): PositionEvent | null {
+  return useSyncExternalStore(positions.subscribe, positions.get);
 }
 
 function report(error: unknown) {

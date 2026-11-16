@@ -4,7 +4,7 @@ import { Header } from "./components/Header";
 import { startFeed } from "./data/feed";
 import { useLogsDir } from "./data/logsDir";
 import { EventsView } from "./views/EventsView";
-import { MapView } from "./views/MapView";
+import { MapPanel } from "./views/MapPanel";
 import { MeterView } from "./views/MeterView";
 import "./App.css";
 
@@ -22,7 +22,7 @@ export default function App() {
         </main>
       ) : (
         <main className="dashboard">
-          <MapView />
+          <MapPanel />
           <div className="side">
             <MeterView />
             <EventsView />

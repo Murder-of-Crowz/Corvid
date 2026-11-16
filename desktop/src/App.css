@@ -415,6 +415,27 @@ button {
   padding: 12px 16px;
 }
 
+.map-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.map-tab {
+  padding: 4px 12px;
+  margin-bottom: -1px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.map-tab[aria-selected="true"] {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+
 .map-toolbar {
   display: flex;
   flex-wrap: wrap;
