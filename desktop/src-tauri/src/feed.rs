@@ -12,6 +12,7 @@ use tauri::{AppHandle, Emitter, Runtime};
 use crate::events::{CorvidEvent, EVENTS_CHANNEL, Timestamp};
 use crate::log_reader::LogFollower;
 use crate::parser::Parser;
+use crate::strip::Strip;
 
 // How often the log is checked for new lines.
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
@@ -42,6 +43,7 @@ fn follow<R: Runtime>(app: AppHandle<R>, folder: Option<PathBuf>, chosen: Receiv
     };
     let mut follower = LogFollower::new(folder);
     let mut parser = Parser::new();
+    let mut strip = Strip::new();
     let mut following: Option<PathBuf> = None;
     let mut last_error: Option<String> = None;
 
@@ -66,7 +68,11 @@ fn follow<R: Runtime>(app: AppHandle<R>, folder: Option<PathBuf>, chosen: Receiv
                 last_error = Some(message);
             }
         }
-        parser.end_idle_fight(now_ms(), &mut events);
+        let now = now_ms();
+        parser.end_idle_fight(now, &mut events);
+        if let Some(position) = parser.me().and_then(|me| strip.read(now, me)) {
+            events.push(CorvidEvent::Position(position));
+        }
         send(&app, events);
 
         if follower.current_path() != following.as_deref() {
@@ -80,15 +86,17 @@ fn follow<R: Runtime>(app: AppHandle<R>, folder: Option<PathBuf>, chosen: Receiv
     }
 }
 
-/// Reads the zone and map from what `path` already holds. The game only writes
-/// them when a log starts or the player changes zone, and the follower starts
-/// at the end of a log that's already open.
+/// Reads the zone, the map and who you are from what `path` already holds. The
+/// game only writes them when a log starts, the player changes zone or does
+/// something, and the follower starts at the end of a log that's already open.
 fn catch_up(parser: &mut Parser, path: &Path) {
     match fs::read(path) {
         Ok(bytes) => {
-            for line in String::from_utf8_lossy(&bytes).lines() {
+            let text = String::from_utf8_lossy(&bytes);
+            for line in text.lines() {
                 parser.read_zone_and_map(line);
             }
+            parser.read_me(&text);
         }
         Err(error) => eprintln!("[corvid] couldn't read {}: {error}", path.display()),
     }

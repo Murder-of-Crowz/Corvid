@@ -42,6 +42,7 @@ pub struct Parser {
     last_position_at: HashMap<String, Timestamp>,
     fight: Option<Fight>,
     fight_count: u32,
+    me: Option<Unit>,
 }
 
 struct Fight {
@@ -77,6 +78,8 @@ impl Parser {
         let event = f[0];
         let source = unit(f[1], f[2], f[3]);
         let target = unit(f[5], f[6], f[7]);
+        self.learn_me(&source);
+        self.learn_me(&target);
         let involves_me =
             source.affiliation == Affiliation::Me || target.affiliation == Affiliation::Me;
         let advanced = if event.starts_with("SWING_") { 9 } else { 12 };
@@ -116,6 +119,23 @@ impl Parser {
         }
     }
 
+    /// Reads only who you are from a log's text, making no events: from the
+    /// newest line naming you. The feed uses this on the part of a log written
+    /// before it started following it.
+    pub fn read_me(&mut self, text: &str) {
+        let newest = text.lines().rev().find(|line| line.contains(",0x511,"));
+        if let Some((_, f)) = newest.and_then(split_line)
+            && f.len() >= 9
+        {
+            self.learn_me(&unit(f[1], f[2], f[3]));
+            self.learn_me(&unit(f[5], f[6], f[7]));
+        }
+    }
+
+    pub fn me(&self) -> Option<&Unit> {
+        self.me.as_ref()
+    }
+
     /// Ends the current fight once it has been quiet for a while. The log only
     /// shows that when its next line comes, so the feed calls this on a timer.
     pub fn end_idle_fight(&mut self, now: Timestamp, events: &mut Vec<CorvidEvent>) {
@@ -125,6 +145,15 @@ impl Parser {
             .is_some_and(|fight| now - fight.last_ts > FIGHT_GAP_MS + WRITE_DELAY_MS)
         {
             self.end_fight(events);
+        }
+    }
+
+    fn learn_me(&mut self, unit: &Unit) {
+        if unit.affiliation == Affiliation::Me
+            && unit.kind == UnitKind::Player
+            && self.me.as_ref() != Some(unit)
+        {
+            self.me = Some(unit.clone());
         }
     }
 

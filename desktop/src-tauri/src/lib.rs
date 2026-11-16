@@ -3,6 +3,7 @@ pub mod feed;
 pub mod log_reader;
 pub mod parser;
 pub mod settings;
+pub mod strip;
 
 use std::fs;
 use std::path::PathBuf;
