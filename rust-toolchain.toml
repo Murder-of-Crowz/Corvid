@@ -1,3 +1,5 @@
 [toolchain]
-channel = "1.99.1-x86_64-pc-windows-msvc"
+# Version only: rustup rejects a host here. On Windows it picks MSVC by default,
+# and `npm run check-version` confirms the host.
+channel = "1.99.1"
 profile = "minimal"

@@ -9,9 +9,9 @@ const readJson = (name, base) =>
 const manifest = readJson("package.json", desktop);
 const lock = readJson("package-lock.json", desktop);
 const toolchain = readFileSync(new URL("rust-toolchain.toml", root), "utf8");
-const [, rustVersion, rustHost] = toolchain.match(
-  /^channel = "([0-9.]+)-([^"]+)"$/m,
-);
+const [, rustVersion] = toolchain.match(/^channel = "([0-9.]+)"$/m);
+// Windows is the first target. rust-toolchain.toml can't name the host, so it's set here.
+const rustHost = "x86_64-pc-windows-msvc";
 
 function check(label, current, expected) {
   const matches = current === expected;

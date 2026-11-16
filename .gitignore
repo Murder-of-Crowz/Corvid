@@ -22,6 +22,9 @@ WoWChatLog*.txt
 /WTF/
 /Corvid/
 
+# Sample sessions built from personal combat logs by scripts/make-sample-session.mjs
+/fixtures/events/*
+
 # Local environment settings
 .env
 .env.*

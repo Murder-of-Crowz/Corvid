@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 // @ts-expect-error type error without @types/node package
@@ -28,5 +29,17 @@ export default defineConfig(() => ({
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],
     },
+    // 4. the browser replay loads ../fixtures. Allow only that folder, so the
+    //    real logs in WTF/ cannot be served.
+    fs: {
+      allow: [".", "../fixtures", "../WTF/Zones"],
+    },
+  },
+
+  test: {
+    // Vitest's file cache would remember whether the sample session existed on
+    // the first run, so tests kept skipping after it was built. The suite is
+    // small enough that the cache doesn't save noticeable time.
+    fsModuleCache: false,
   },
 }));
