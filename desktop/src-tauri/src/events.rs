@@ -71,6 +71,7 @@ pub enum PositionSource {
 pub struct PositionEvent {
     pub ts: Timestamp,
     pub unit: Unit,
+    /// 0 when there's no position to show, like a party member who left your map.
     pub map_id: u32,
     pub x: f64,
     pub y: f64,

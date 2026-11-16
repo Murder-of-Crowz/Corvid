@@ -70,8 +70,9 @@ fn follow<R: Runtime>(app: AppHandle<R>, folder: Option<PathBuf>, chosen: Receiv
         }
         let now = now_ms();
         parser.end_idle_fight(now, &mut events);
-        if let Some(position) = parser.me().and_then(|me| strip.read(now, me)) {
-            events.push(CorvidEvent::Position(position));
+        if let Some(me) = parser.me() {
+            let positions = strip.read(now, me, parser.group());
+            events.extend(positions.into_iter().map(CorvidEvent::Position));
         }
         send(&app, events);
 

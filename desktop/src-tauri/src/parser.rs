@@ -43,6 +43,7 @@ pub struct Parser {
     fight: Option<Fight>,
     fight_count: u32,
     me: Option<Unit>,
+    group: HashMap<String, Unit>,
 }
 
 struct Fight {
@@ -78,8 +79,8 @@ impl Parser {
         let event = f[0];
         let source = unit(f[1], f[2], f[3]);
         let target = unit(f[5], f[6], f[7]);
-        self.learn_me(&source);
-        self.learn_me(&target);
+        self.learn_player(&source);
+        self.learn_player(&target);
         let involves_me =
             source.affiliation == Affiliation::Me || target.affiliation == Affiliation::Me;
         let advanced = if event.starts_with("SWING_") { 9 } else { 12 };
@@ -127,13 +128,18 @@ impl Parser {
         if let Some((_, f)) = newest.and_then(split_line)
             && f.len() >= 9
         {
-            self.learn_me(&unit(f[1], f[2], f[3]));
-            self.learn_me(&unit(f[5], f[6], f[7]));
+            self.learn_player(&unit(f[1], f[2], f[3]));
+            self.learn_player(&unit(f[5], f[6], f[7]));
         }
     }
 
     pub fn me(&self) -> Option<&Unit> {
         self.me.as_ref()
+    }
+
+    /// Players in your group the log has named, by GUID.
+    pub fn group(&self) -> &HashMap<String, Unit> {
+        &self.group
     }
 
     /// Ends the current fight once it has been quiet for a while. The log only
@@ -148,12 +154,16 @@ impl Parser {
         }
     }
 
-    fn learn_me(&mut self, unit: &Unit) {
-        if unit.affiliation == Affiliation::Me
-            && unit.kind == UnitKind::Player
-            && self.me.as_ref() != Some(unit)
-        {
-            self.me = Some(unit.clone());
+    fn learn_player(&mut self, unit: &Unit) {
+        if unit.kind != UnitKind::Player {
+            return;
+        }
+        match unit.affiliation {
+            Affiliation::Me if self.me.as_ref() != Some(unit) => self.me = Some(unit.clone()),
+            Affiliation::Party | Affiliation::Raid if self.group.get(&unit.guid) != Some(unit) => {
+                self.group.insert(unit.guid.clone(), unit.clone());
+            }
+            _ => {}
         }
     }
 
