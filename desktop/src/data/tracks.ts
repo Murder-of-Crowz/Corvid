@@ -1,5 +1,6 @@
 import type { CorvidEvent, PositionEvent, Unit } from "./event";
 import type { Fight } from "./fights";
+import { MAP_HEIGHT, MAP_WIDTH } from "./zones";
 
 export interface TrackPoint {
   ts: number;
@@ -18,12 +19,57 @@ export interface MapState {
   others: Track[];
 }
 
+/** A position of yours, not a pet's or anyone else's. */
+export function isYourPosition(event: CorvidEvent): event is PositionEvent {
+  return event.type === "position" && event.unit.affiliation === "self" && event.unit.kind === "player";
+}
+
 export function latestPosition(events: readonly CorvidEvent[]): PositionEvent | null {
   for (let i = events.length - 1; i >= 0; i--) {
     const event = events[i];
-    if (event.type === "position" && event.unit.affiliation === "self" && event.unit.kind === "player") return event;
+    if (isYourPosition(event)) return event;
   }
   return null;
+}
+
+/** A position of a player in your group, not yours, a pet's or a stranger's. */
+export function isGroupPosition(event: CorvidEvent): event is PositionEvent {
+  return (
+    event.type === "position" &&
+    event.unit.kind === "player" &&
+    (event.unit.affiliation === "party" || event.unit.affiliation === "raid")
+  );
+}
+
+/** How far you move, in map unites, before your arrow turns: A few yards in most zones. */
+const MINE_MOVE = 1;
+
+/** WHich way ou last moved, and where you were when it was worked out. */
+export interface Heading {
+  from: PositionEvent;
+  degrees: number | null;
+}
+
+/**
+ * Your heading once you're at `to`. It only turns after you've gone MIN_MOVE
+ * from where it last turned, so small steps can't spin it, and it starts over
+ * on a new map.
+ */
+export function nextHeading(was: Heading | null, to: PositionEvent): Heading {
+  if (!was || was.from.mapId !== to.mapId) return { from: to, degrees: null };
+  const dx = (to.x - was.from.x) * MAP_WIDTH;
+  const dy = (to.y - was.from.y) * MAP_HEIGHT;
+  if (Math.hypot(dx, dy) < MINE_MOVE) return was;
+  return { from: to, degrees: (Math.atan2(dx, -dy) * 180) / Math.PI };
+}
+
+/** Your heading after every pos of yours in `events`. */
+export function headingOf(events: readonly CorvidEvent[]): number | null {
+  let heading: Heading | null = null;
+  for (const event of events) {
+    if (isYourPosition(event)) heading = nextHeading(heading, event);
+  }
+  return heading?.degrees ?? null;
 }
 
 /**

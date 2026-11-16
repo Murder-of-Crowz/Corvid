@@ -532,3 +532,19 @@ button {
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
+
+.map-arrow {
+  stroke-linejoin: round;
+}
+
+/* A party member's name over their pin, outlined so it reads on any map. */
+.map-name {
+  fill: var(--text);
+  stroke: var(--bg);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  paint-order: stroke;
+  font-size: 12px;
+  font-weight: 600;
+  text-anchor: middle;
+}

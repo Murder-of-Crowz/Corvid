@@ -46,6 +46,7 @@ export interface PositionEvent {
   type: "position";
   ts: Timestamp;
   unit: Unit;
+  /** 0 when there's no position to show, like a party member who left your map. */
   mapId: number;
   x: number;
   y: number;

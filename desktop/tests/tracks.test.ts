@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
-import type { CorvidEvent, Unit } from "../src/data/event";
+import type { CorvidEvent, PositionEvent, Unit } from "../src/data/event";
 import type { Fight } from "../src/data/fights";
-import { boundsOf, buildMapState, encounterMarks, trailSegments } from "../src/data/tracks";
+import {
+  boundsOf,
+  buildMapState,
+  encounterMarks,
+  headingOf,
+  latestPosition,
+  nextHeading,
+  trailSegments,
+  type Heading,
+} from "../src/data/tracks";
 import { sampleEvents } from "./sample";
 
 describe("buildMapState", () => {
@@ -86,5 +95,71 @@ describe("encounterMarks", () => {
       { number: 1, name: "Zombie", x: 0.1, y: 0.1 },
       { number: 3, name: "Spider", x: 0.5, y: 0.5 },
     ]);
+  });
+});
+
+describe("nextHeading", () => {
+  const me: Unit = { guid: "me", name: "me", kind: "player", affiliation: "self" };
+  const at = (x: number, y: number, mapId = 1420): PositionEvent =>
+    ({ type: "position", ts: 0, unit: me, mapId, x, y, source: "strip" });
+  const walk = (...points: PositionEvent[]): Heading | null =>
+    points.reduce<Heading | null>((was, to) => nextHeading(was, to), null);
+
+  it("has no direction until you move", () => {
+    expect(walk(at(0.5, 0.5))?.degrees).toBeNull();
+  });
+
+  it("points the way you went, clockwise from up", () => {
+    expect(walk(at(0.5, 0.5), at(0.5, 0.49))?.degrees).toBeCloseTo(0);
+    expect(walk(at(0.5, 0.5), at(0.51, 0.5))?.degrees).toBeCloseTo(90);
+    expect(walk(at(0.5, 0.5), at(0.5, 0.51))?.degrees).toBeCloseTo(180);
+    expect(walk(at(0.5, 0.5), at(0.49, 0.5))?.degrees).toBeCloseTo(-90);
+  });
+
+  it("allows for the map being wider than it is tall", () => {
+    // 0.01 across is 10.02 map units, but 0.01 down is only 6.68.
+    const degrees = walk(at(0.5, 0.5), at(0.51, 0.49))?.degrees ?? NaN;
+    expect(degrees).toBeCloseTo((Math.atan2(10.02, 6.68) * 180) / Math.PI);
+    expect(degrees).not.toBeCloseTo(45);
+  });
+
+  it("keeps its direction through a step too small to tell", () => {
+    const going = walk(at(0.5, 0.5), at(0.51, 0.5));
+    expect(nextHeading(going, at(0.51, 0.5003))).toBe(going);
+  });
+
+  it("adds small steps up until they're far enough to turn", () => {
+    // Each step is 0.6 map units down, less than it takes to turn.
+    const step = 0.6 / 668;
+    const going = walk(at(0.5, 0.5), at(0.51, 0.5));
+    const once = nextHeading(going, at(0.51, 0.5 + step));
+    expect(once.degrees).toBeCloseTo(90);
+    const twice = nextHeading(once, at(0.51, 0.5 + 2 * step));
+    expect(twice.degrees).toBeCloseTo(180);
+  });
+
+  it("starts over on a new map", () => {
+    const going = walk(at(0.5, 0.5), at(0.51, 0.5));
+    expect(nextHeading(going, at(0.2, 0.2, 1421)).degrees).toBeNull();
+  });
+});
+
+describe("headingOf", () => {
+  const unit = (guid: string, affiliation: Unit["affiliation"]): Unit =>
+    ({ guid, name: guid, kind: "player", affiliation });
+  const at = (who: Unit, x: number, y: number): PositionEvent =>
+    ({ type: "position", ts: 0, unit: who, mapId: 1420, x, y, source: "log" });
+  const me = unit("me", "self");
+  const friend = unit("friend", "party");
+
+  it("follows only your positions", () => {
+    const events: CorvidEvent[] = [at(me, 0.5, 0.5), at(friend, 0.9, 0.1), at(me, 0.5, 0.52), at(friend, 0.1, 0.9)];
+    expect(headingOf(events)).toBeCloseTo(180);
+    expect(latestPosition(events)).toBe(events[2]);
+  });
+
+  it("is null before you've moved", () => {
+    expect(headingOf([])).toBeNull();
+    expect(headingOf([at(me, 0.5, 0.5), at(friend, 0.6, 0.5)])).toBeNull();
   });
 });

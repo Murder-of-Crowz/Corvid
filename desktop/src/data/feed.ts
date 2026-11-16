@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useSyncExternalStore } from "react";
 import { EVENTS_CHANNEL, toEvents, type CorvidEvent, type PositionEvent } from "./event";
 import { eventStore, MAX_EVENTS } from "./store";
-import { latestPosition } from "./tracks";
+import { type Heading, headingOf, isGroupPosition, latestPosition, nextHeading } from "./tracks";
 
 /**
  * Live event batches from the Rust BE. They are kept while a replay is
@@ -12,6 +12,9 @@ import { latestPosition } from "./tracks";
 class LiveSource {
   private events: CorvidEvent[] = [];
   private position: PositionEvent | null = null;
+  private heading: Heading | null = null;
+  private party = new Map<string, PositionEvent>();
+  private partyList: readonly PositionEvent[] = [];
   private positionListeners = new Set<() => void>();
   private showing = false;
   private unlisten: (() => void) | null = null;
@@ -24,6 +27,15 @@ class LiveSource {
       const position = latestPosition(batch);
       if (position) {
         this.position = position;
+        this.heading = nextHeading(this.heading, position);
+      }
+      const members = batch.filter(isGroupPosition);
+      for (const member of members) {
+        if (member.mapId === 0) this.party.delete(member.unit.guid);
+        else this.party.set(member.unit.guid, member);
+      }
+      if (members.length > 0) this.partyList = [...this.party.values()];
+      if (position || members.length > 0) {
         for (const listener of this.positionListeners) listener();
       }
       const kept = batch.filter((event) => event.type !== "position" || event.source !== "strip");
@@ -53,6 +65,10 @@ class LiveSource {
   }
 
   getPosition = (): PositionEvent | null => this.position;
+
+  getHeading = (): number | null => this.heading?.degrees ?? null;
+
+  getParty = (): readonly PositionEvent[] => this.partyList;
 
   subscribePosition = (listener: () => void): (() => void) => {
     this.positionListeners.add(listener);
@@ -293,6 +309,28 @@ const positions = live
 /** Your newest live position, even while a replay is showing. Null until the first one. */
 export function useLivePosition(): PositionEvent | null {
   return useSyncExternalStore(positions.subscribe, positions.get);
+}
+
+/** The same for whuich way you last moved. */
+const headings = live
+  ? { subscribe: live.subscribePosition, get: live.getHeading }
+  : { subscribe: eventStore.subscribe, get: () => headingOf(eventStore.getSnapshot().events) };
+
+/** Which way you last moved, in degrees clockwise from up. Null until you've moved on this map. */
+export function useLiveHeading(): number | null {
+  return useSyncExternalStore(headings.subscribe, headings.get);
+}
+
+const NO_PARTY: readonly PositionEvent[] = [];
+
+/** The same for your party. The sample session has none of their positions. */
+const partyPositions = live
+  ? { subscribe: live.subscribePosition, get: live.getParty }
+  : { subscribe: eventStore.subscribe, get: () => NO_PARTY };
+
+/** Your party member's newest live positions, leaving out anyone who left your map or the group. */
+export function useLiveParty(): readonly PositionEvent[] {
+  return useSyncExternalStore(partyPositions.subscribe, partyPositions.get);
 }
 
 function report(error: unknown) {
