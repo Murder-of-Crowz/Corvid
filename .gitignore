@@ -19,7 +19,7 @@ node_modules/
 # WoW client logs and local addon data
 WoWCombatLog*.txt
 WoWChatLog*.txt
-/WTF/
+# /WTF/
 /Corvid/
 
 # Sample sessions built from personal combat logs by scripts/make-sample-session.mjs
