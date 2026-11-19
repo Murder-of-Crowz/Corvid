@@ -62,7 +62,7 @@ function MeterHalf({ fight, mode, label}: MeterHalfProps) {
     <section className={`meter-half meter-${mode}`} aria-label={label}>
       <h3 className="meter-heading">{label}</h3>
       {rows.length === 0 ? (
-        <p className="meter-note muted">No {mode} by your side in this fight.</p>
+        <p className="meter-none muted">No {mode} by your side in this fight.</p>
       ) : (
         <ol className="meter-rows">
           {rows.map((row) => (
