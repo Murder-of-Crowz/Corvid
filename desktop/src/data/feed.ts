@@ -249,8 +249,12 @@ export class ReplaySource {
  * The sample session is not committed. scripts/make-sample-session.mjs builds it.
  * import.meta.glob finds it when it exists and returns nothing when it doesn't,
  * so the app still builds without it. It's loaded on demand, never at startup.
+ * It's made from real combat logs, with other players' names, so only the dev
+ * server has it. Builds, and so the app's installers, leave it out.
  */
-const samples = import.meta.glob<unknown>("../../../fixtures/events/sample-session.json", { import: "default" });
+const samples: Record<string, () => Promise<unknown>> = import.meta.env.DEV
+  ? import.meta.glob<unknown>("../../../fixtures/events/sample-session.json", { import: "default" })
+  : {};
 
 const SAMPLE = "Sample session";
 
