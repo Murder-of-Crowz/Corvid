@@ -2,25 +2,25 @@
 
 Corvid is a Windows desktop companion and Lua addon for World of Warcraft: Forever. We’re building a combat log reader, a damage and healing meter, and a map that shows positions from combat events. The goal is to keep recent fights locally so players can review them after combat.
 
-The desktop app shows everything on one screen: a map with your trail and numbered fights, a damage and healing meter with a per-spell breakdown, and a list of raw events. The Rust backend follows the newest combat log as WoW writes it and sends events to the UI through the contract in `desktop/src/data/event.ts`. You can also replay any earlier log from the header, even while you play. In a browser, the UI replays a recorded sample session instead, so you can work on it without Rust or the game. The addon attempts to enable advanced combat logging on world entry, and `/corvid` checks which player and party positions the game returns.
+The desktop app shows everything on one screen: a map with your trail and numbered fights, a meter with damage above healing and a per-spell breakdown, and a list of raw events. The Rust backend follows the newest combat log as WoW writes it and sends events to the UI through the contract in `desktop/src/data/event.ts`. You can also replay any earlier log from the header, even while you play. In a browser, the UI replays a recorded sample session instead, so you can work on it without Rust or the game. The addon attempts to enable advanced combat logging on world entry, and `/corvid` checks which player and party positions the game returns.
 
-The map draws the zone under your trail, from a map image you export from your own game files. Tirisfal Glades and Silverpine Forest are set up so far. Other zones are drawn on a grid.
+The map draws the zone under your trail. The app draws each zone's map from the game's own files in your World of Warcraft folder, so no map art ships with Corvid. A zone the game has no map for is drawn on a grid.
 
 | Folder | Contents |
 | --- | --- |
 | `addon/` | `Corvid.toc` and `Corvid.lua` |
 | `desktop/src/` | React + TypeScript UI, built with Vite |
-| `desktop/src/components/` | Header with the log picker and replay controls, and the log folder prompt |
-| `desktop/src/data/` | Event contract, event store, live and replay feed, log folder, and the fight and map calculations |
+| `desktop/src/components/` | Header with the log picker and replay controls, the World of Warcraft folder prompt, and the zone map |
+| `desktop/src/data/` | Event contract, event store, live and replay feed, the World of Warcraft folder, zone names, and the fight and map calculations |
 | `desktop/src/views/` | Meter, map, and events views |
 | `desktop/tests/` | Vitest tests |
 | `desktop/src-tauri/` | Rust backend and Tauri configuration |
-| `desktop/src-tauri/src/` | Log follower, combat log parser, live feed, settings, and the commands the UI calls |
+| `desktop/src-tauri/src/` | Log follower, combat log parser, live feed, settings, and the commands the UI calls. `wow.rs` knows where things are in the World of Warcraft folder. `casc.rs`, `db2.rs`, and `blp.rs` read the game's storage, data tables, and textures, and `maps.rs` draws and caches the maps |
 | `desktop/src-tauri/tests/` | Rust tests |
 | `fixtures/events/` | Sample session for the browser replay and the tests, built locally and not committed |
-| `WTF/` | Your own combat logs in `CombatLog/` and exported zone maps in `Zones/`, kept locally and not committed |
+| `WTF/` | Your own combat logs in `CombatLog/`, kept locally and not committed. `Zones/` has zone maps exported with wow.export that were used for testing. The app doesn't use them, and builds don't include them |
 | `scripts/` | Version check, and the script that builds the sample session |
-| `.github/workflows/` | CI |
+| `.github/workflows/` | CI, which also builds the Windows installers on `main` |
 
 ## Tech stack and pinned versions
 
@@ -82,15 +82,15 @@ Install npm packages from `desktop/`, not the repo root. The root `package.json`
 
 Type `/combatlog` in game to start logging. The map needs advanced combat logging, which puts positions in the log. The addon tries to turn it on for you.
 
-The first time the app starts, it asks for the folder WoW writes combat logs to, usually `_forever_\Logs` in the WoW install. It remembers the folder in `%APPDATA%\io.github.murder-of-crowz.corvid\settings.json`. To change it, click the folder name at the right of the header.
+The first time the app starts, it asks for your World of Warcraft folder, the one with `_forever_` in it. Picking `_forever_` or its `Logs` folder works too. The app reads combat logs from `_forever_\Logs` and draws maps from the game's files. It remembers the folder in `%APPDATA%\io.github.murder-of-crowz.corvid\settings.json`. To change it, click the folder name at the right of the header. Versions before 0.2.0 saved the log folder instead, so after updating, the app asks once.
 
 ### Live
 
-The dropdown in the header starts on **Live**. The app follows the newest `WoWCombatLog-*.txt` in the folder from its end, so fights from before the app started don't appear. Pick that log in the dropdown to see them. When the game starts a new log, the app reads the rest of the old one, then follows the new one from its start.
+The dropdown in the header starts on **Live**. The app follows the newest `WoWCombatLog-*.txt` in `_forever_\Logs` from its end, so fights from before the app started don't appear. Pick that log in the dropdown to see them. When the game starts a new log, the app reads the rest of the old one, then follows the new one from its start.
 
 ### Replay a log
 
-The dropdown lists every combat log in the folder, newest first, by the date and time in its name, such as `11/13/26 14:40`. It looks for new logs each time you open it. Picking one loads the whole log and plays it from the start:
+The dropdown lists every combat log in `_forever_\Logs`, newest first, by the date and time in its name, such as `11/13/26 14:40`. It looks for new logs each time you open it. Picking one loads the whole log and plays it from the start:
 
 - **Play** and **Pause**.
 - **Prev** and **Next** jump to the start of the previous or next encounter. **Prev** on the first one goes back to the start of the log.
@@ -99,22 +99,25 @@ The dropdown lists every combat log in the folder, newest first, by the date and
 
 Events keep their real times from the log. Live events keep arriving in the background during a replay, so you can review an old log while you play. Choosing **Live** again shows everything, including fights that finished in the meantime. The view never jumps to the latest on its own.
 
+### The meter
+
+The meter shows the latest fight, or one you pick from its dropdown. Damage fills the top half and healing the bottom half, each sorted from most to least and each scrolling on its own. Click a player for their per-spell breakdown. Each half opens its own, and all of them start closed. Totals leave out overkill and overheal.
+
 ### The map
 
 Numbered circles mark where each fight started, counting from 1 for the oldest. The latest is filled in, and hovering one shows who the fight was against. The log only has positions during combat, so dashed lines join the trail across the stretches between fights. **Close-up** fits the view to the trail and **Whole zone** shows the full zone.
 
-Behind the trail is the zone's map, if you've exported its image. A zone without one is drawn on a grid. Positions from the log land on the right spots on the image with no adjustment.
+Behind the trail is the zone's map, fully explored. A zone the game has no map for is drawn on a grid. Positions from the log land on the right spots on the map with no adjustment.
 
-#### Add a zone map
+#### Where the maps come from
 
-The map art belongs to Blizzard, so it isn't in the repo. Never commit it or ship it in a build. Each developer exports their own from their game install:
+The map art belongs to Blizzard, so Corvid never ships it. Instead, the first time a zone is shown, the app reads its map from the game's own storage in your World of Warcraft folder and draws it, fully explored. It only reads the game's files and never changes them. Drawing a zone takes about 0.3 seconds in a release build and 2 seconds under `npm run tauri dev`.
 
-1. Use [wow.export](https://github.com/Kruithne/wow.export) on your WoW install to export the zone's map as a PNG. It names the file `Zone_<zoneId>_<Name>.png`, such as `Zone_85_Tirisfal_Glades.png`, at 1002×668, the size the map is drawn at.
-2. Put the file in the repo's `WTF/Zones/` folder, which is gitignored.
-3. The log doesn't use the zone ID in the file name. It names maps by their uiMapID instead, such as `1420` on `MAP_CHANGE` lines. If the zone isn't in `MAPS` in `desktop/src/views/MapView.tsx` yet, add a line that pairs the two, like `1420: { name: "Tirisfal Glades", zoneId: 85 }`.
-4. Restart `npm run tauri dev` or `npm run dev` to pick up the new image.
+Drawn maps are kept in `%LOCALAPPDATA%\io.github.murder-of-crowz.corvid\maps\<game version>\`, so each zone is only drawn once. A game patch starts a new folder and removes the old one.
 
-A build bundles every image in `WTF/Zones/` into the app. Empty the folder before building anything you'll give to someone else.
+The log names maps by their uiMapID, such as `1420` on `MAP_CHANGE` lines. Every map the game has gets a picture, but a zone missing from `MAPS` in `desktop/src/data/zones.ts` is titled **Map 1420**. To name one, add a line like `1420: { name: "Tirisfal Glades" }`.
+
+The PNGs in `WTF/Zones/` were exported with [wow.export](https://github.com/Kruithne/wow.export) and used for testing. The app doesn't use them, and builds don't include them. CI fails a build that has any in it. Don't commit or ship any other map art.
 
 ### How fights are read from the log
 
@@ -128,7 +131,7 @@ A build bundles every image in `WTF/Zones/` into the app. Empty the folder befor
 
 The UI runs without Rust or the game. In a browser, it replays a sample session built from one of your own combat logs, so build that first.
 
-1. Find a combat log in the WoW: Forever client's `Logs\` folder, for example `WoWCombatLog-110526_231729.txt`. Use one recorded with advanced combat logging on, so it has positions for the map. You can pass its full path to the script, or copy it into the repo's `WTF/CombatLog/` folder, which is gitignored.
+1. Find a combat log in the WoW: Forever client's `Logs\` folder, for example `WoWCombatLog-110526_231729.txt`. Use one recorded with advanced combat logging on, so it has positions for the map. You can pass its full path to the script, or copy it into the repo's `WTF/CombatLog/` folder. Combat log files are gitignored wherever they are.
 2. From the repo root, build the sample session:
 
    ```powershell
@@ -145,7 +148,7 @@ The UI runs without Rust or the game. In a browser, it replays a sample session 
    npm run dev
    ```
 
-Open <http://localhost:1420>. Outside Tauri, the app replays `fixtures/events/sample-session.json` with the same controls as a replay in the app. The header shows **Sample session** in place of the log dropdown, since a browser can't read the log folder.
+Open <http://localhost:1420>. Outside Tauri, the app replays `fixtures/events/sample-session.json` with the same controls as a replay in the app. The header shows **Sample session** in place of the log dropdown, since a browser can't read the log folder. Maps are drawn on a grid, since there are no game files to draw them from.
 
 If the header shows **No encounters** and the views are empty, the sample session is missing. The developer console also logs `[corvid] No sample session`. Run step 2, then restart `npm run dev`.
 
@@ -153,7 +156,9 @@ If the header shows **No encounters** and the views are empty, the sample sessio
 
 `desktop/src/data/event.ts` defines the events Rust sends to the UI. Rust emits batches (`CorvidEvent[]`) on the Tauri event `corvid://events`, with camelCase field names. On the Rust side, use `#[serde(tag = "type", rename_all = "camelCase")]`. The UI drops events that don't match the contract and logs a `[corvid]` warning in the developer console, so check the console first if events don't appear. Under `npm run tauri dev`, right-click in the window and choose **Inspect** to open the console.
 
-The UI also calls four Tauri commands. `logs_dir` and `choose_logs_dir` get and set the log folder. `list_logs` returns the combat log names for the dropdown, and `read_log` returns one log's events as a single `CorvidEvent[]` for a replay. `read_log` only accepts names that `list_logs` returns, so the UI can't read files outside the folder.
+The UI also calls four Tauri commands. `wow_dir` and `choose_wow_dir` get and set the World of Warcraft folder. `list_logs` returns the names of the combat logs in `_forever_\Logs` for the dropdown, and `read_log` returns one log's events as a single `CorvidEvent[]` for a replay. `read_log` only accepts names that `list_logs` returns, so the UI can't read files outside that folder.
+
+Map pictures come from the app's `map` protocol. The UI shows `http://map.localhost/<uiMapID>.png`, made with `convertFileSrc`, and the app answers with the drawn PNG, or a 404 when the game has no such map or no folder has been chosen.
 
 ## Sample session
 
@@ -161,7 +166,9 @@ The UI also calls four Tauri commands. `logs_dir` and `choose_logs_dir` get and 
 
 The script writes `fixtures/events/sample-session.json` unless you pass a different output path as a second argument. It also shortens idle stretches so the replay doesn't sit still between fights. Each developer builds their own, and `fixtures/events/` is gitignored, so the file is never committed.
 
-Don't commit raw combat logs either. They contain other players' names. `WTF/` and `WoWCombatLog*.txt` are gitignored. Outside `desktop/`, the dev server only serves `fixtures/` and `WTF/Zones/`, so a page can't fetch your logs in `WTF/CombatLog/`.
+Only the dev server has the sample session. Builds leave it out, so it never ends up in an installer.
+
+Don't commit raw combat logs either. They contain other players' names. `WoWCombatLog*.txt` files are gitignored wherever they are. Outside `desktop/`, the dev server only serves `fixtures/`, so a page can't fetch your logs in `WTF/CombatLog/`.
 
 ## Tests
 
@@ -171,16 +178,25 @@ From `desktop/`:
 npm test
 ```
 
-This reruns the tests each time you save a file. To run them once, use `npx vitest run`. Tests live in `desktop/tests/` as `*.test.ts` files and cover the event contract, text and number formatting, log names in the dropdown, fight totals, map trails and encounter markers, and the replay controls. They need neither the game nor Rust.
+This reruns the tests each time you save a file. To run them once, use `npx vitest run`. Tests live in `desktop/tests/` as `*.test.ts` files and cover the event contract, text and number formatting, log names in the dropdown, fight totals, map trails and encounter markers, zone names and map pictures, and the replay controls. They need neither the game nor Rust.
 
 Most tests use small made-up events. Four also run on your sample session, if you've built one, and check things that hold for any log, such as meter totals matching the raw events. Without a sample session, as in CI, those four are skipped.
 
-The Rust tests live in `desktop/src-tauri/tests/`. They cover the event JSON against the contract, the parser on lines shaped like real logs, following and listing logs on real files in a temporary folder, and saving the settings. Tauri embeds `desktop/dist` when it compiles, so build the frontend once first if `dist/` doesn't exist yet. From `desktop/`:
+The Rust tests live in `desktop/src-tauri/tests/`. They cover the event JSON against the contract, the parser on lines shaped like real logs, following and listing logs on real files in a temporary folder, saving the settings, finding the World of Warcraft folder from whichever folder is picked, and decoding the textures map tiles are stored as. Tauri embeds `desktop/dist` when it compiles, so build the frontend once first if `dist/` doesn't exist yet. From `desktop/`:
 
 ```powershell
 npm run build
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
+
+The test that draws a map needs the game installed, so it's skipped unless you ask for it, and CI never runs it. To run it on a computer with the game, from `desktop/src-tauri/`:
+
+```powershell
+$env:CORVID_WOW_DIR = "C:\path\to\World of Warcraft"
+cargo test --test maps -- --ignored
+```
+
+It draws Tirisfal Glades, checks its size and that it's cached, and checks that a map the game doesn't have is remembered as missing.
 
 ## Install and test the WoW addon
 
@@ -210,14 +226,15 @@ cargo check --locked --manifest-path src-tauri/Cargo.toml
 npm run tauri build -- --debug --no-bundle
 ```
 
-The first command runs the tests once. The second checks TypeScript, including the tests, and builds the Vite frontend into `dist/`. The Cargo command checks the Rust backend and fails if Cargo would need to change the lockfile. The last command builds the Windows debug executable without packaging an installer. To build a release installer, use `npm run tauri build`. Builds include any zone maps in `WTF/Zones/`, so empty that folder before sharing one.
+The first command runs the tests once. The second checks TypeScript, including the tests, and builds the Vite frontend into `dist/`. The Cargo command checks the Rust backend and fails if Cargo would need to change the lockfile. The last command builds the Windows debug executable without packaging an installer. To build the release installers, use `npm run tauri build`. They land in `src-tauri/target/release/bundle/`, as `nsis/Corvid_<version>_x64-setup.exe` and `msi/Corvid_<version>_x64_en-US.msi`. The version comes from `src-tauri/tauri.conf.json`, the only place it's set, so bump it there for a release. Builds include neither map art nor the sample session. The installers aren't signed yet, so Windows SmartScreen warns before running them.
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every push on any branches, and when started manually from the **Actions** tab. It has two jobs:
+`.github/workflows/ci.yml` runs on every push on any branches, and when started manually from the **Actions** tab. It has three jobs:
 
 - **Web UI** (Ubuntu): installs npm packages, runs the tests, then type-checks and builds the frontend. The build step runs even when tests fail, so one run reports both.
 - **Rust backend** (Windows): installs the toolchain pinned in `rust-toolchain.toml`, runs `npm run check-version`, builds the frontend (Tauri embeds `desktop/dist` when it compiles), then runs `cargo test --locked`.
+- **Windows installers** (Windows): runs only on `main`, such as after a pull request is merged, and only once both jobs above pass. It runs `npm run tauri build`, fails if map art or a sample session got into the build, and uploads the NSIS and MSI installers as an artifact named `Corvid-<version>-<commit>`. Download it from the run's **Summary** page, under **Artifacts**.
 
 ## Fix: Tauri reports that Cargo was not found
 

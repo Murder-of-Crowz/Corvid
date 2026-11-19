@@ -1,18 +1,18 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 
-export interface LogsDir {
+export interface WowDir {
   path: string | null | undefined;
   choose: () => void;
 }
 
-export function useLogsDir(): LogsDir {
+export function useWowDir(): WowDir {
   const [path, setPath] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
     if (!isTauri()) return;
     let current = true;
-    invoke<string | null>("logs_dir")
+    invoke<string | null>("wow_dir")
       .then((saved) => {
         if (current) setPath(saved);
       })
@@ -23,7 +23,7 @@ export function useLogsDir(): LogsDir {
   }, []);
 
   const choose = () => {
-    invoke<string | null>("choose_logs_dir")
+    invoke<string | null>("choose_wow_dir")
       .then((chosen) => {
         if (chosen !== null) setPath(chosen);
       })
@@ -39,22 +39,22 @@ export interface CombatLogs {
 }
 
 /** The combat logs in `folder`, newest first, for the replay picker. */
-export function useCombatLogs(folder: string | null | undefined): CombatLogs {
+export function useCombatLogs(wowDir: string | null | undefined): CombatLogs {
   const [names, setNames] = useState<string[]>([]);
   const [asked, setAsked] = useState(0);
 
   useEffect(() => {
-    if (!isTauri() || !folder) return;
+    if (!isTauri() || !wowDir) return;
     let current = true;
     invoke<string[]>("list_logs")
       .then((found) => {
         if (current) setNames(found);
       })
-      .catch((error: unknown) => console.error("[corvid] the combat logs coulndn't be listed", error))
+      .catch((error: unknown) => console.error("[corvid] the combat logs couldn't be listed", error))
     return () => {
       current = false;
     };
-  }, [folder, asked])
+  }, [wowDir, asked])
   
   return { names, refresh: () => setAsked((n) => n + 1) };
 }

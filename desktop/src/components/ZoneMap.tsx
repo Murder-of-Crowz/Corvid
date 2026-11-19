@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { TrackPoint } from "../data/tracks";
 import { MAP_HEIGHT, MAP_WIDTH, type ViewBox } from "../data/zones";
 import { formatClock, formatCoord } from "../lib/format";
@@ -51,6 +51,8 @@ interface ZoneMapProps {
 
 /** The zone's map image, or a grid where there isn't one, under whatever a view draws. */
 export function ZoneMap({ image, view, label, children }: ZoneMapProps) {
+  const [missing, setMissing] = useState<string | null>(null);
+  const shown = image !== missing ? image : undefined;
   const step = view.w < MAP_WIDTH ? 0.01 : 0.1;
   return (
     <svg
@@ -59,9 +61,19 @@ export function ZoneMap({ image, view, label, children }: ZoneMapProps) {
       role="img"
       aria-label={label}
     >
-      {image && <image href={image} x={0} y={0} width={MAP_WIDTH} height={MAP_HEIGHT} />}
+      {shown && (
+        <image
+          href={shown}
+          x={0}
+          y={0}
+          width={MAP_WIDTH}
+          height={MAP_HEIGHT}
+          preserveAspectRatio="none"
+          onError={() => setMissing(shown)}
+        />
+      )}
       <rect className="map-edge" x={0} y={0} width={MAP_WIDTH} height={MAP_HEIGHT} />
-      {!image && (
+      {!shown && (
         <>
           {gridLines(view.x / MAP_WIDTH, (view.x + view.w) / MAP_WIDTH, step).map((x) => (
             <line key={`x${x}`} className="map-grid" x1={x * MAP_WIDTH} x2={x * MAP_WIDTH} y1={0} y2={MAP_HEIGHT} />

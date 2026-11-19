@@ -31,16 +31,16 @@ fn a_missing_file_gives_the_defaults() {
         Settings::load(&dir.0.join("settings.json")),
         Settings::default()
     );
-    assert_eq!(Settings::default().logs_dir, None);
+    assert_eq!(Settings::default().wow_dir, None);
 }
 
 #[test]
-fn saves_and_loads_the_logs_folder() {
+fn saves_and_loads_the_wow_folder() {
     let dir = TempDir::new("roundtrip");
     // The app config folder may not exist yet on first run.
     let path = dir.0.join("not-yet").join("settings.json");
     let settings = Settings {
-        logs_dir: Some(PathBuf::from(r"D:\Games\WoW Forever\Logs")),
+        wow_dir: Some(PathBuf::from(r"D:\Games\World of Warcraft")),
     };
 
     settings.save(&path).unwrap();
@@ -50,7 +50,7 @@ fn saves_and_loads_the_logs_folder() {
         serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
     assert_eq!(
         json,
-        serde_json::json!({ "logsDir": r"D:\Games\WoW Forever\Logs" })
+        serde_json::json!({ "wowDir": r"D:\Games\World of Warcraft" })
     );
 }
 

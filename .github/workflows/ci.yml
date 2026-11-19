@@ -74,3 +74,65 @@ jobs:
       - name: Test
         working-directory: desktop/src-tauri
         run: cargo test --locked
+
+  installers:
+    name: Windows installers
+    # Only main gets installers, like after a pull request is merged, and only
+    # once the UI and Rust checks above have passed.
+    needs: [web, rust]
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: desktop/package.json
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+
+      - name: Install npm packages
+        working-directory: desktop
+        run: npm ci
+
+      - name: Check tool versions
+        run: npm run check-version
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      # Builds the UI, then the app, then the MSI and NSIS installers.
+      - name: Build
+        working-directory: desktop
+        run: npm run tauri build
+
+      # Blizzard's map art and sample sessions made from real combat logs must
+      # never ship. Neither is in a build today; this fails the run if one gets in.
+      - name: Check the build for files that must not ship
+        working-directory: desktop
+        run: |
+          $found = Get-ChildItem dist -Recurse -File |
+            Where-Object { $_.Name -like 'Zone_*' -or $_.Name -like 'sample-session*' }
+          foreach ($file in $found) { "::error::$($file.Name) is in the build" }
+          if ($found) { exit 1 }
+
+      # The installers are named for the version in tauri.conf.json.
+      - name: Name the upload
+        id: name
+        run: |
+          $version = (Get-Content -Raw desktop/src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "artifact=Corvid-$version-$($env:GITHUB_SHA.Substring(0, 7))" >> $env:GITHUB_OUTPUT
+
+      # Download them from the run's Summary page, under Artifacts.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.name.outputs.artifact }}
+          path: |
+            desktop/src-tauri/target/release/bundle/nsis/Corvid_${{ steps.name.outputs.version }}_*.exe
+            desktop/src-tauri/target/release/bundle/msi/Corvid_${{ steps.name.outputs.version }}_*.msi
+          if-no-files-found: error

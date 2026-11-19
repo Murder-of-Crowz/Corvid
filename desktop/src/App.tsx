@@ -1,24 +1,25 @@
 import { useEffect } from "react";
-import { ChooseLogsDir } from "./components/ChooseLogsDir";
+import { ChooseWowDir } from "./components/ChooseWowDir";
 import { Header } from "./components/Header";
 import { startFeed } from "./data/feed";
-import { useLogsDir } from "./data/logsDir";
+import { useWowDir } from "./data/wowDir";
 import { EventsView } from "./views/EventsView";
 import { MapPanel } from "./views/MapPanel";
 import { MeterView } from "./views/MeterView";
 import "./App.css";
 
+
 export default function App() {
-  const logsDir = useLogsDir();
+  const wowDir = useWowDir();
 
   useEffect(() => startFeed(), []);
 
   return (
     <div className="app">
-      <Header logsDir={logsDir} />
-      {logsDir.path === null ? (
+      <Header wowDir={wowDir} />
+      {wowDir.path === null ? (
         <main className="app-main">
-          <ChooseLogsDir onChoose={logsDir.choose} />
+          <ChooseWowDir onChoose={wowDir.choose} />
         </main>
       ) : (
         <main className="dashboard">
