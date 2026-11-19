@@ -11,22 +11,17 @@ const MODES: { id: MeterMode; label: string }[] = [
 /** Dmg or healing per player, for the latesy fight or one picked from session. */
 export function MeterView() {
   const { events } = useEventFeed();
-  const [mode, setMode] = useState<MeterMode>("damage");
   const [pinnedId, setPinnedId] = useState<string | null>(null);
-  const [openGuid, setOpenGuid] = useState<string | null>(null);
 
   const fights = useMemo(() => buildFights(events), [events]);
   const fight = fights.find((f) => f.id === pinnedId) ?? fights[fights.length - 1];
-  const rows = useMemo(() => (fight ? meterRows(fight, mode) : []), [fight, mode]);
 
   if (!fight) {
     return <p className="view-empty">No fights yet. Damage and healing by you and your party show up here.</p>;
   }
 
-  const top = rows[0]?.total ?? 0;
-
   return (
-    <section className={`meter meter-${mode}`}>
+    <section className="meter">
       <select
         className="select meter-fight"
         aria-label="Fight"
@@ -41,26 +36,33 @@ export function MeterView() {
         ))}
       </select>
 
-      <div className="meter-modes" role="group" aria-label="Show">
-        {MODES.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            className="chip"
-            aria-pressed={mode === m.id}
-            onClick={() => setMode(m.id)}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
-
       <p className="meter-title">
         {fight.name} : <span className="muted">{fight.end === undefined ? "in combat" : formatClock(fight.end)}</span>
       </p>
 
+      {MODES.map((m) => (
+        <MeterHalf key={m.id} fight={fight} mode={m.id} label={m.label} />
+      ))}
+    </section>
+  );
+}
+
+interface MeterHalfProps {
+  fight: Fight;
+  mode: MeterMode;
+  label: string;
+}
+
+function MeterHalf({ fight, mode, label}: MeterHalfProps) {
+  const [openGuid, setOpenGuid] = useState<string | null>(null);
+  const rows = useMemo(() => meterRows(fight, mode), [fight, mode]);
+  const top = rows[0]?.total ?? 0;
+
+  return (
+    <section className={`meter-half meter-${mode}`} aria-label={label}>
+      <h3 className="meter-heading">{label}</h3>
       {rows.length === 0 ? (
-        <p className="view-empty">No {mode} by your side in this fight.</p>
+        <p className="meter-note muted">No {mode} by your side in this fight.</p>
       ) : (
         <ol className="meter-rows">
           {rows.map((row) => (
