@@ -1,21 +1,21 @@
 import { REPLAY_SPEEDS, replay, useReplayStatus, watch, type ReplayStatus } from "../data/feed";
-import { useCombatLogs, type LogsDir } from "../data/logsDir";
+import { useCombatLogs, type WowDir } from "../data/wowDir";
 import { folderName, formatClock, logLabel } from "../lib/format";
 
 interface HeaderProps {
-  logsDir: LogsDir;
+  wowDir: WowDir;
 }
 
 /** The title, which log is showing (live or replay), and the replay control */
-export function Header({ logsDir }: HeaderProps) {
+export function Header({ wowDir }: HeaderProps) {
   const status = useReplayStatus();
-  const logs = useCombatLogs(logsDir.path); 
+  const logs = useCombatLogs(wowDir.path); 
 
   return (
     <header className="header">
       <h1 className="header-title">Corvid</h1>
 
-      {logsDir.path ? (
+      {wowDir.path ? (
         <select
           className="select"
           aria-label="log"
@@ -36,14 +36,14 @@ export function Header({ logsDir }: HeaderProps) {
 
       {status && <ReplayControls status={status} />}
 
-      {logsDir.path && (
+      {wowDir.path && (
         <button
           type="button"
           className="link header-folder"
-          title={`Reading combat logs from ${logsDir.path}. Click to change`}
-          onClick={logsDir.choose}
+          title={`Reading combat logs from ${wowDir.path}. Click to change`}
+          onClick={wowDir.choose}
         >
-          {folderName(logsDir.path)}
+          {folderName(wowDir.path)}
         </button>
       )}
     </header>

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
-    pub logs_dir: Option<PathBuf>,
+    pub wow_dir: Option<PathBuf>
 }
 
 impl Settings {
