@@ -98,7 +98,7 @@ function MeterBar({ row, share, open, onToggle }: MeterBarProps) {
     <li>
       <button type="button" className="meter-bar" aria-expanded={open} onClick={onToggle}>
         <span className="meter-fill" style={{ width: `${share * 100}%` }} />
-        <span className="meter-name">{row.unit.name}</span>
+        <span className="meter-name" title={row.unit.name}>{row.unit.name}</span>
         <span className="meter-value">
           {formatNumber(row.total)} <span className="muted">{formatRate(row.perSecond)}/s</span>
         </span>
@@ -124,7 +124,7 @@ function SpellTable({ row }: { row: MeterRow }) {
       <tbody>
         {row.spells.map((spell) => (
           <tr key={spell.key}>
-            <th scope="row">{spell.name}</th>
+            <th scope="row" title={spell.name}>{spell.name}</th>
             <td>{formatNumber(spell.total)}</td>
             <td>{formatPercent(row.total > 0 ? spell.total / row.total : 0)}</td>
             <td>{spell.hits}</td>

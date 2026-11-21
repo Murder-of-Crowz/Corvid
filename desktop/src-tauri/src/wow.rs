@@ -22,3 +22,13 @@ pub fn flavor(wow: &Path) -> PathBuf {
 pub fn logs(wow: &Path) -> PathBuf {
     flavor(wow).join("Logs")
 }
+
+/// Where Corvid keeps the maps it draws: a `Maps` folder in its own addon
+/// folder. The game only loads the files `Corvid.toc` names, so it ignores them.
+pub fn maps(wow: &Path) -> PathBuf {
+    flavor(wow)
+        .join("Interface")
+        .join("AddOns")
+        .join("Corvid")
+        .join("Maps")
+}

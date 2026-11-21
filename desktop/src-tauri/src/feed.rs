@@ -87,15 +87,17 @@ fn follow<R: Runtime>(app: AppHandle<R>, folder: Option<PathBuf>, chosen: Receiv
     }
 }
 
-/// Reads the zone, the map and who you are from what `path` already holds. The
-/// game only writes them when a log starts, the player changes zone or does
-/// something, and the follower starts at the end of a log that's already open.
+/// Reads the zone, the map, who you are and who's in your group from what
+/// `path` already holds. The game only writes them when a log starts, the
+/// player changes zone or does something, and the follower starts at the end
+/// of a log that's already open.
 fn catch_up(parser: &mut Parser, path: &Path) {
     match fs::read(path) {
         Ok(bytes) => {
             let text = String::from_utf8_lossy(&bytes);
             for line in text.lines() {
                 parser.read_zone_and_map(line);
+                parser.read_group(line);
             }
             parser.read_me(&text);
         }

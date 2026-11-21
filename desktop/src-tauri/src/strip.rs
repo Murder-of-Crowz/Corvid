@@ -1,7 +1,7 @@
 //! Reads where you and your party are from the strip of squares the addon
 //! paints in the game's top-left corner. `addon/Corvid.lua` describes it.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::events::{Affiliation, PositionEvent, PositionSource, Timestamp, Unit, UnitKind};
 
@@ -54,6 +54,7 @@ pub struct Strip {
     read_at: Option<Timestamp>,
     last: Option<StripPosition>,
     party: HashMap<String, (usize, StripPosition)>,
+    named: HashSet<String>,
 }
 
 impl Strip {
@@ -125,7 +126,9 @@ impl Strip {
         }
 
         for (guid, (_, position)) in &party {
-            if self.party.get(guid).map(|(_, was)| was) != Some(position) {
+            let moved = self.party.get(guid).map(|(_, was)| was) != Some(position);
+            let newly_named = group.contains_key(guid) && self.named.insert(guid.clone());
+            if moved || newly_named {
                 events.push(position_event(now, member(group, guid), *position));
             }
         }
