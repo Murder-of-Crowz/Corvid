@@ -32,16 +32,24 @@ pub fn png(flavor: &Path, cache: &Path, map: u32) -> io::Result<Option<Vec<u8>>>
         return Ok((!bytes.is_empty()).then_some(bytes));
     }
     let png = draw(&Storage::open(flavor)?, map)?;
+    if let Err(error) = save(cache, &folder, &path, png.as_deref()) {
+        eprintln!("[corvid] couldn't save map {map} in {}: {error}", folder.display());
+    }
+    Ok(png)
+}
+
+/// Saves a drawn map, or an empty file for a map the game doesn't have. The
+/// first map for a new game version removes the old version's folders.
+fn save(cache: &Path, folder: &Path, path: &Path, png: Option<&[u8]>) -> io::Result<()> {
     if !folder.exists() {
         if let Ok(old) = fs::read_dir(cache) {
             for entry in old.flatten() {
                 let _ = fs::remove_dir_all(entry.path());
             }
         }
-        fs::create_dir_all(&folder)?;
+        fs::create_dir_all(folder)?;
     }
-    fs::write(&path, png.as_deref().unwrap_or_default())?;
-    Ok(png)
+    fs::write(path, png.unwrap_or_default())
 }
 
 struct Grid {

@@ -1,9 +1,10 @@
-//! Turns combat log lines into events for the UI. It keeps what involves the
-//! player running the app (unit flags 0x511): the damage and healing they do
-//! and take, deaths in their fights, and where they are.
+//! Turns combat log lines into events for the UI. It keeps what involves your
+//! side: the player running the app (unit flags 0x511), their party or raid,
+//! and everyone's pets. That's the damage and healing your side does and
+//! takes, deaths in your fights, and where you are.
 //!
-//! The log has no fight boundaries. A fight starts with the first damage to or
-//! from the player and ends after [`FIGHT_GAP_MS`] without any.
+//! The log has no fight boundaries. A fight starts with the first damage
+//! between your side and anyone else, and ends after [`FIGHT_GAP_MS`] without any.
 
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
@@ -14,7 +15,7 @@ use crate::events::{
     UnitKind,
 };
 
-/// A fight ends after this long with no damage to or from the player.
+/// A fight ends after this long with no damage to or from your side.
 pub const FIGHT_GAP_MS: Timestamp = 6000;
 /// Lines reach the file a moment after their timestamp, so the clock only ends
 /// a fight once this much longer has passed.
@@ -81,8 +82,7 @@ impl Parser {
         let target = unit(f[5], f[6], f[7]);
         self.learn_player(&source);
         self.learn_player(&target);
-        let involves_me =
-            source.affiliation == Affiliation::Me || target.affiliation == Affiliation::Me;
+        let involves_us = on_our_side(&source) || on_our_side(&target);
         let advanced = if event.starts_with("SWING_") { 9 } else { 12 };
 
         match event {
@@ -90,13 +90,13 @@ impl Parser {
             // Thorns and other damage shield hit whoever strikes their holder.
             | "DAMAGE_SHIELD" => {
                 self.add_position(ts, &f, advanced, &source, &target, events);
-                if involves_me {
+                if involves_us {
                     self.add_damage(ts, &f, advanced, source, target, events);
                 }
             }
             "SPELL_HEAL" | "SPELL_PERIODIC_HEAL" => {
                 self.add_position(ts, &f, advanced, &source, &target, events);
-                if involves_me {
+                if involves_us {
                     self.add_heal(ts, &f, source, target, events);
                 }
             }
@@ -126,6 +126,21 @@ impl Parser {
     pub fn read_me(&mut self, text: &str) {
         let newest = text.lines().rev().find(|line| line.contains(",0x511,"));
         if let Some((_, f)) = newest.and_then(split_line)
+            && f.len() >= 9
+        {
+            self.learn_player(&unit(f[1], f[2], f[3]));
+            self.learn_player(&unit(f[5], f[6], f[7]));
+        }
+    }
+    
+    /// Reads only the players in your group from a line, making no events. The
+    /// feed uses this on the part of a log written before it started following
+    /// it, so the map can name party members before they next show up in it.
+    pub fn read_group(&mut self, line: &str) {
+        if !line.contains("512,") && !line.contains("514,") {
+            return;
+        }
+        if let Some((_, f)) = split_line(line)
             && f.len() >= 9
         {
             self.learn_player(&unit(f[1], f[2], f[3]));
@@ -252,7 +267,7 @@ impl Parser {
         let Some(amount) = field(f, s) else {
             return;
         };
-        let enemy = if source.affiliation == Affiliation::Me {
+        let enemy = if on_our_side(&source) {
             &target
         } else {
             &source
@@ -304,16 +319,16 @@ impl Parser {
         })));
     }
 
-    /// The player's death, or the death of something they're fighting. The log
+    /// A death on your side, or of something your side is fighting. The log
     /// has a UNIT_DIED for every mob anyone kills, so the rest are skipped.
     fn add_death(&mut self, ts: Timestamp, target: Unit, events: &mut Vec<CorvidEvent>) {
-        let mine = target.affiliation == Affiliation::Me;
+        let ours = on_our_side(&target);
         let fight_id = match &mut self.fight {
-            Some(fight) if mine || fight.enemies.contains(&target.guid) => {
+            Some(fight) if ours || fight.enemies.contains(&target.guid) => {
                 fight.last_ts = fight.last_ts.max(ts);
                 Some(fight.id.clone())
             }
-            _ if mine => None,
+            _ if ours => None,
             _ => return,
         };
         events.push(CorvidEvent::Combat(CombatEvent::Death(DeathEvent {
@@ -455,6 +470,10 @@ fn map_bounds(f: &[&str]) -> Option<[f64; 4]> {
 
 fn round4(n: f64) -> f64 {
     (n * 10_000.0).round() / 10_000.0
+}
+
+fn on_our_side(unit: &Unit) -> bool {
+    unit.affiliation != Affiliation::Outsider
 }
 
 /// A unit from its GUID, name and flags fields.

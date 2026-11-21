@@ -130,8 +130,7 @@ fn map_png(app: &AppHandle, id: u32) -> Option<Vec<u8>> {
         .unwrap()
         .wow_dir
         .clone()?;
-    let cache = app.path().app_cache_dir().ok()?.join("maps");
-    maps::png(&wow::flavor(&wow), &cache, id).unwrap_or_else(|error| {
+    maps::png(&wow::flavor(&wow), &wow::maps(&wow), id).unwrap_or_else(|error| {
         eprintln!("[corvid] couldn't draw map {id}: {error}");
         None
     })
@@ -143,6 +142,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            if let Ok(cache) = app.path().app_cache_dir() {
+                let _ = fs::remove_dir_all(cache.join("Maps"));
+            }
             let settings_path = app.path().app_config_dir()?.join("settings.json");
             let settings = Settings::load(&settings_path);
             let feed = Feed::start(app.handle().clone(), settings.wow_dir.as_deref().map(wow::logs));

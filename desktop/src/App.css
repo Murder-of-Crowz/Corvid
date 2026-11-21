@@ -384,6 +384,13 @@ button {
   position: relative;
 }
 
+.meter-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .meter-value {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -406,14 +413,20 @@ button {
 
 .spells th,
 .spells td {
-  padding: 3px 10px;
+  padding: 3px 6px;
   border-bottom: 1px solid var(--border);
   text-align: right;
+  white-space: nowrap;
 }
 
 .spells th:first-child {
+  width: 100%;
+  max-width: 0;
+  overflow: hidden;
+  padding-left: 10px;
   text-align: left;
   font-weight: normal;
+  text-overflow: ellipsis;
 }
 
 .spells thead th {

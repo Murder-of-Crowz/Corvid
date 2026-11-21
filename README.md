@@ -2,7 +2,7 @@
 
 Corvid is a Windows desktop companion and Lua addon for World of Warcraft: Forever. We’re building a combat log reader, a damage and healing meter, and a map that shows positions from combat events. The goal is to keep recent fights locally so players can review them after combat.
 
-The desktop app shows everything on one screen: a map with your trail and numbered fights, a meter with damage above healing and a per-spell breakdown, and a list of raw events. The Rust backend follows the newest combat log as WoW writes it and sends events to the UI through the contract in `desktop/src/data/event.ts`. You can also replay any earlier log from the header, even while you play. In a browser, the UI replays a recorded sample session instead, so you can work on it without Rust or the game. The addon attempts to enable advanced combat logging on world entry, and `/corvid` checks which player and party positions the game returns.
+The desktop app shows everything on one screen: a map with your trail and numbered fights, a meter with your party's damage above its healing and a per-spell breakdown, and a list of raw events. The Rust backend follows the newest combat log as WoW writes it and sends events to the UI through the contract in `desktop/src/data/event.ts`. You can also replay any earlier log from the header, even while you play. In a browser, the UI replays a recorded sample session instead, so you can work on it without Rust or the game. The addon attempts to enable advanced combat logging on world entry, and `/corvid` checks which player and party positions the game returns.
 
 The map draws the zone under your trail. The app draws each zone's map from the game's own files in your World of Warcraft folder, so no map art ships with Corvid. A zone the game has no map for is drawn on a grid.
 
@@ -101,7 +101,9 @@ Events keep their real times from the log. Live events keep arriving in the back
 
 ### The meter
 
-The meter shows the latest fight, or one you pick from its dropdown. Damage fills the top half and healing the bottom half, each sorted from most to least and each scrolling on its own. Click a player for their per-spell breakdown. Each half opens its own, and all of them start closed. Totals leave out overkill and overheal.
+The meter shows the latest fight, or one you pick from its dropdown. It lists you and everyone in your party or raid who did damage or healing in that fight. Damage fills the top half and healing the bottom half, each sorted from most to least and each scrolling on its own. Click a player for their per-spell breakdown. Each half opens its own, and all of them start closed. A pet's damage and healing count toward its owner, with the pet's name after each of its spells. Totals leave out overkill and overheal.
+
+The meter only counts what's in your log. In the open world, the game may leave out what happens far from you, so a party member who wanders off can come up short.
 
 ### The map
 
@@ -113,7 +115,9 @@ Behind the trail is the zone's map, fully explored. A zone the game has no map f
 
 The map art belongs to Blizzard, so Corvid never ships it. Instead, the first time a zone is shown, the app reads its map from the game's own storage in your World of Warcraft folder and draws it, fully explored. It only reads the game's files and never changes them. Drawing a zone takes about 0.3 seconds in a release build and 2 seconds under `npm run tauri dev`.
 
-Drawn maps are kept in `%LOCALAPPDATA%\io.github.murder-of-crowz.corvid\maps\<game version>\`, so each zone is only drawn once. A game patch starts a new folder and removes the old one.
+Drawn maps are kept in Corvid's addon folder, in `_forever_\Interface\AddOns\Corvid\Maps\<game version>\`, so each zone is only drawn once. The game only loads the files `Corvid.toc` lists, so it ignores them. The app makes the folder even if the addon isn't installed. A game patch starts a new folder and removes the old one. If a map can't be saved, it still shows and is drawn again next time.
+
+Versions before 0.2.1 kept the maps in `%LOCALAPPDATA%\io.github.murder-of-crowz.corvid\maps\`. The app deletes that folder when it starts.
 
 The log names maps by their uiMapID, such as `1420` on `MAP_CHANGE` lines. Every map the game has gets a picture, but a zone missing from `MAPS` in `desktop/src/data/zones.ts` is titled **Map 1420**. To name one, add a line like `1420: { name: "Tirisfal Glades" }`.
 
@@ -121,8 +125,8 @@ The PNGs in `WTF/Zones/` were exported with [wow.export](https://github.com/Krui
 
 ### How fights are read from the log
 
-- Only lines that involve you become events. Fights between party members and mobs aren't tracked.
-- A fight starts with damage between you and an outsider, such as a mob, and is named after them. Any other enemy hit before it ends joins the same fight. It ends after 6 seconds with no damage.
+- Only lines that involve your side become events. Your side is you, your party or raid, and their pets. Fights between other players and mobs aren't tracked.
+- A fight starts with damage between your side and an outsider, such as a mob, and is named after that outsider. Any other enemy that trades damage with your side before it ends joins the same fight. It ends after 6 seconds with no damage.
 - Heals join the fight in progress but never start one. Damage within your own side, like Scorned by the Light hurting you, is kept as an event but belongs to no fight, so the meter doesn't count it.
 - Melee is logged twice, as `SWING_DAMAGE` and `SWING_DAMAGE_LANDED`, and counts once. Damage shields like Thorns are logged as `DAMAGE_SHIELD` and count as damage.
 - Your position is taken from your own events, at most once a second. It needs the zone's `MAP_CHANGE` line, which the app reads from earlier in the log when it starts partway through one.
@@ -162,7 +166,7 @@ Map pictures come from the app's `map` protocol. The UI shows `http://map.localh
 
 ## Sample session
 
-`scripts/make-sample-session.mjs` builds the sample session from a real combat log. It keeps only events involving the player who recorded the log and the mobs they fought, and drops everyone else. The recording player's name and GUID are kept.
+`scripts/make-sample-session.mjs` builds the sample session from a real combat log. It keeps only events involving the player who recorded the log and the mobs they fought, and drops everyone else. Unlike the app, it drops party members' fights too, so the browser's meter shows little beyond your own numbers. The recording player's name and GUID are kept.
 
 The script writes `fixtures/events/sample-session.json` unless you pass a different output path as a second argument. It also shortens idle stretches so the replay doesn't sit still between fights. Each developer builds their own, and `fixtures/events/` is gitignored, so the file is never committed.
 
